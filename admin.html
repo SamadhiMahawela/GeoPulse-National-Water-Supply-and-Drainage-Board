@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VES Server — Admin</title>
+<style>
+  :root{ --navy:#102A3D; --teal:#1C6E76; --ochre:#C67B2E; --paper:#F6F4EE; --line:#D6D0BE; --ink:#1B1E1F; }
+  *{box-sizing:border-box;}
+  body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--paper);color:var(--ink);margin:0;}
+  header{background:var(--navy);color:#fff;padding:16px 20px;}
+  header h1{margin:0;font-size:18px;}
+  header p{margin:4px 0 0;font-size:12px;color:#B9C6CE;}
+  main{max-width:1100px;margin:0 auto;padding:20px;}
+  .card{background:#fff;border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:16px;}
+  label{display:block;font-size:12px;font-weight:600;color:#50575C;margin-bottom:4px;}
+  input{width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;font-size:14px;margin-bottom:10px;}
+  button{background:var(--navy);color:#fff;border:none;border-radius:4px;padding:8px 14px;font-size:13px;cursor:pointer;margin-right:8px;}
+  button.secondary{background:transparent;color:var(--navy);border:1px solid var(--line);}
+  button.danger{background:#AE3B2E;}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  th,td{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top;}
+  th{font-size:10.5px;text-transform:uppercase;color:#7B8287;}
+  #status{font-size:13px;margin-top:8px;}
+  #status.err{color:#AE3B2E;}
+  #status.ok{color:#2F6E4E;}
+  .pill{display:inline-block;background:#EEEADC;border-radius:20px;padding:1px 8px;font-size:11px;}
+  .empty{padding:30px;text-align:center;color:#7B8287;}
+</style>
+</head>
+<body>
+<header>
+  <h1>VES Server — Admin</h1>
+  <p>Read-only overview of every survey saved by any device connected to this server.</p>
+</header>
+<main>
+  <div class="card">
+    <label for="baseUrl">Server URL</label>
+    <input id="baseUrl" placeholder="https://your-ves-server.onrender.com">
+    <label for="apiKey">API key</label>
+    <input id="apiKey" type="password" placeholder="Server's API key">
+    <button id="connectBtn">Connect</button>
+    <button class="secondary" id="refreshBtn">Refresh</button>
+    <button class="secondary" id="exportBtn">Export all as CSV</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="card">
+    <div id="tableHost"><div class="empty">Connect to a server above to see surveys.</div></div>
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var LS_KEY = "ves_admin_connection_v1";
+
+  var baseUrlEl = document.getElementById("baseUrl");
+  var apiKeyEl = document.getElementById("apiKey");
+  var statusEl = document.getElementById("status");
+  var tableHost = document.getElementById("tableHost");
+  var lastRows = [];
+
+  function loadSaved(){
+    try{
+      var s = JSON.parse(localStorage.getItem(LS_KEY));
+      if (s){ baseUrlEl.value = s.baseUrl || ""; apiKeyEl.value = s.apiKey || ""; }
+    }catch(e){}
+  }
+  function persist(){
+    localStorage.setItem(LS_KEY, JSON.stringify({baseUrl: baseUrlEl.value.trim(), apiKey: apiKeyEl.value.trim()}));
+  }
+
+  function setStatus(msg, cls){
+    statusEl.textContent = msg;
+    statusEl.className = cls || "";
+  }
+
+  function fetchSurveys(){
+    var base = baseUrlEl.value.trim().replace(/\/+$/,"");
+    var key = apiKeyEl.value.trim();
+    if (!base){ setStatus("Enter a server URL.", "err"); return; }
+    setStatus("Loading…");
+    fetch(base + "/api/surveys", { headers: { "x-api-key": key } })
+      .then(function(res){
+        if (!res.ok) throw new Error("Server responded " + res.status + " (check the API key)");
+        return res.json();
+      })
+      .then(function(rows){
+        lastRows = rows;
+        renderTable(rows);
+        setStatus("Loaded " + rows.length + " survey(s) — " + new Date().toLocaleTimeString(), "ok");
+      })
+      .catch(function(err){ setStatus("Error: " + err.message, "err"); });
+  }
+
+  function esc(s){
+    return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  function renderTable(rows){
+    if (!rows.length){ tableHost.innerHTML = '<div class="empty">No surveys on this server yet.</div>'; return; }
+    var html = '<table><thead><tr>' +
+      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th>' +
+      '</tr></thead><tbody>';
+    rows.forEach(function(r){
+      html += '<tr>' +
+        '<td style="font-family:monospace;font-size:11px;">'+esc(r.chartId||"—")+'</td>' +
+        '<td>'+esc(r.siteName||"—")+'</td>' +
+        '<td>'+esc(r.clientName||"—")+'</td>' +
+        '<td>'+esc(r.vesNo||"—")+'</td>' +
+        '<td>'+esc(r.date||"—")+'</td>' +
+        '<td><span class="pill">'+esc(r.array||"—")+'</span></td>' +
+        '<td>'+ (r.readings ? r.readings.length : 0) +'</td>' +
+        '<td>'+ (r.attachments ? r.attachments.length : 0) +'</td>' +
+        '<td>'+esc(r.operator||"—")+'</td>' +
+        '<td style="font-family:monospace;font-size:11px;">'+esc((r.deviceId||"").slice(0,10))+'</td>' +
+        '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table>';
+    tableHost.innerHTML = html;
+  }
+
+  function exportCsv(){
+    if (!lastRows.length){ setStatus("Nothing loaded to export yet — click Refresh first.", "err"); return; }
+    var lines = ["Chart ID,Site,Client,VES No,Date,Array,Readings Count,Recorded By,Device,Updated"];
+    lastRows.forEach(function(r){
+      lines.push([
+        r.chartId, r.siteName, r.clientName, r.vesNo, r.date, r.array, (r.readings||[]).length, r.operator, r.deviceId,
+        r.updatedAt ? new Date(r.updatedAt).toISOString() : ""
+      ].map(function(v){ return '"' + String(v==null?"":v).replace(/"/g,'""') + '"'; }).join(","));
+    });
+    var blob = new Blob([lines.join("\n")], {type:"text/csv"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ves_all_surveys_" + new Date().toISOString().slice(0,10) + ".csv";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ document.body.removeChild(a); }, 300);
+  }
+
+  document.getElementById("connectBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
+  document.getElementById("refreshBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
+  document.getElementById("exportBtn").addEventListener("click", exportCsv);
+
+  loadSaved();
+  if (baseUrlEl.value) fetchSurveys();
+})();
+</script>
+</body>
+</html>

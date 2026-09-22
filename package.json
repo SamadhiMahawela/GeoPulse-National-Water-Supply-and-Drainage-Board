@@ -1,0 +1,20 @@
+{
+  "name": "ves-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Shared database + API for the VES Field Tool, so surveys saved on any device show up for everyone.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
