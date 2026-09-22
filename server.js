@@ -5,7 +5,7 @@ const cors = require("cors");
 const path = require("path");
 
 const requireApiKey = require("./middleware/auth");
-const surveysRouter = require('./surveys');
+const surveysRouter = require('./routes/surveys');
 
 const app = express();
 
