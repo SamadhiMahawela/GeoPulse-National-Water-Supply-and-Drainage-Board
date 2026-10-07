@@ -11,6 +11,10 @@ const app = express();
 
 app.use(cors());               // allow the front-end (any origin/device) to call this API
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
+// Serve static files from root directory
+app.use(express.static(path.join(__dirname)));
+
+// Explicit fallback for root index page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
