@@ -11,6 +11,9 @@ const app = express();
 
 app.use(cors());               // allow the front-end (any origin/device) to call this API
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // ---------------------------------------------------------------------
 // Optional simple login gate for the web pages (the app itself and the
