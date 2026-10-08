@@ -216,7 +216,7 @@
       </svg>`;
     }
 
-    // 3. Resolve Attachment Images & Clickable Links
+    // 3. Resolve Attachment Images with Safe Modal View & Explicit Base URL
     var attachmentsHtml = '<p style="font-size:12px;color:#7B8287;">No attachments.</p>';
     if (s.attachments && s.attachments.length > 0) {
       attachmentsHtml = '<div style="display:flex; flex-wrap:wrap; gap:12px;">' +
@@ -225,22 +225,19 @@
           var name = att.name || 'Attachment';
           var imgSrc = rawSrc;
 
-          // Convert relative paths to absolute URLs using the server address
           if (rawSrc && !rawSrc.startsWith('data:') && !rawSrc.startsWith('http://') && !rawSrc.startsWith('https://')) {
             imgSrc = serverBase + (rawSrc.startsWith('/') ? '' : '/') + rawSrc;
           }
 
-          return '<div style="text-align:center; border:1px solid #D6D0BE; padding:6px; border-radius:4px; background:#fafafa;">' +
-                   '<a href="' + esc(imgSrc) + '" target="_blank" title="Click to view full image">' +
-                     '<img src="' + esc(imgSrc) + '" alt="' + esc(name) + '" style="max-width:180px; max-height:180px; object-fit:contain; display:block; margin-bottom:4px; border:1px solid #E0E0E0; background:#fff;"/>' +
-                   '</a>' +
+          return '<div style="text-align:center; border:1px solid #D6D0BE; padding:6px; border-radius:4px; background:#fafafa; cursor:pointer;" onclick="openImageModal(\'' + esc(imgSrc) + '\')">' +
+                   '<img src="' + esc(imgSrc) + '" alt="' + esc(name) + '" style="max-width:180px; max-height:180px; object-fit:contain; display:block; margin-bottom:4px; border:1px solid #E0E0E0; background:#fff;"/>' +
                    '<span style="font-size:11px; color:#50575C;">' + esc(name) + '</span>' +
                  '</div>';
         }).join('') +
       '</div>';
     }
 
-    // 4. Assemble Offline Report Document
+    // 4. Assemble Offline Report Document with Built-in Image Modal
     var htmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -273,7 +270,10 @@
   .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }
   .sig-line { width: 45%; border-top: 1px solid #102A3D; font-size: 11px; color: #50575C; padding-top: 4px; }
 
-  @media print { .print-btn { display: none; } body { margin: 0; } }
+  #imgModal { display: none; position: fixed; z-index: 9999; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; }
+  #imgModal img { max-width: 90%; max-height: 90vh; border-radius: 6px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+
+  @media print { .print-btn, #imgModal { display: none !important; } body { margin: 0; } }
 </style>
 </head>
 <body>
@@ -332,6 +332,23 @@
     <div class="sig-line">Recorded by (name, date)</div>
     <div class="sig-line">Checked by (name, date)</div>
   </div>
+
+  <div id="imgModal" onclick="closeImageModal()">
+    <img id="modalImg" src="" alt="Full view">
+  </div>
+
+  <script>
+    function openImageModal(src) {
+      if(!src) return;
+      var modal = document.getElementById('imgModal');
+      var img = document.getElementById('modalImg');
+      img.src = src;
+      modal.style.display = 'flex';
+    }
+    function closeImageModal() {
+      document.getElementById('imgModal').style.display = 'none';
+    }
+  <\/script>
 </body>
 </html>`;
 
