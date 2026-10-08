@@ -120,7 +120,7 @@
         '<td>'+esc(r.operator||"—")+'</td>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc((r.deviceId||"").slice(0,10))+'</td>' +
         '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
-        '<td><button class="btn-download" data-index="' + index + '">📥 Download HTML Report</button></td>' +
+        '<td><button class="btn-download" data-index="' + index + '">📥 Download Report</button></td>' +
       '</tr>';
     });
     html += '</tbody></table>';
@@ -136,6 +136,9 @@
   }
 
   function downloadStandaloneReport(s) {
+    var serverBase = baseUrlEl.value.trim().replace(/\/+$/,"");
+
+    // 1. Build Reading Rows
     var readings = s.readings || [];
     var readingsRows = readings.map(function(rd, idx) {
       return '<tr>' +
@@ -146,6 +149,7 @@
       '</tr>';
     }).join('');
 
+    // 2. Build Offline SVG Log-Log Plot Chart
     var chartSvg = '<p style="color:#7B8287;font-size:12px;">No valid reading points available for plotting.</p>';
     var validPts = readings.filter(function(r) {
       var x = parseFloat(r.ab2 || r.ab_2);
@@ -163,197 +167,3 @@
 
       var minX = Math.floor(Math.min.apply(null, xVals));
       var maxX = Math.ceil(Math.max.apply(null, xVals));
-      if (minX === maxX) { minX -= 1; maxX += 1; }
-
-      var minY = Math.floor(Math.min.apply(null, yVals));
-      var maxY = Math.ceil(Math.max.apply(null, yVals));
-      if (minY === maxY) { minY -= 1; maxY += 1; }
-
-      function getX(val) {
-        return padL + ((Math.log10(val) - minX) / (maxX - minX)) * plotW;
-      }
-      function getY(val) {
-        return padT + plotH - ((Math.log10(val) - minY) / (maxY - minY)) * plotH;
-      }
-
-      var gridSvg = '';
-      for (var xPow = minX; xPow <= maxX; xPow++) {
-        var xPx = padL + ((xPow - minX) / (maxX - minX)) * plotW;
-        var labelX = Math.pow(10, xPow);
-        gridSvg += `<line x1="${xPx}" y1="${padT}" x2="${xPx}" y2="${padT + plotH}" stroke="#E0E0E0" stroke-width="1"/>`;
-        gridSvg += `<text x="${xPx}" y="${padT + plotH + 18}" font-size="10" fill="#666" text-anchor="middle">${labelX}</text>`;
-      }
-
-      for (var yPow = minY; yPow <= maxY; yPow++) {
-        var yPx = padT + plotH - ((yPow - minY) / (maxY - minY)) * plotH;
-        var labelY = Math.pow(10, yPow);
-        gridSvg += `<line x1="${padL}" y1="${yPx}" x2="${padL + plotW}" y2="${yPx}" stroke="#E0E0E0" stroke-width="1"/>`;
-        gridSvg += `<text x="${padL - 8}" y="${yPx + 4}" font-size="10" fill="#666" text-anchor="end">${labelY}</text>`;
-      }
-
-      var polyPoints = [];
-      var circlesSvg = '';
-      validPts.forEach(function(pt) {
-        var xVal = parseFloat(pt.ab2 || pt.ab_2);
-        var yVal = parseFloat(pt.pa || pt.rho);
-        var cx = getX(xVal);
-        var cy = getY(yVal);
-        polyPoints.push(cx + ',' + cy);
-        circlesSvg += `<circle cx="${cx}" cy="${cy}" r="4" fill="#C67B2E" stroke="#102A3D" stroke-width="1.5"/>`;
-      });
-
-      chartSvg = `<svg width="100%" height="100%" viewBox="0 0 ${svgW} ${svgH}" style="background:#fff; border:1px solid #D6D0BE; border-radius:4px;">
-        ${gridSvg}
-        <rect x="${padL}" y="${padT}" width="${plotW}" height="${plotH}" fill="none" stroke="#B0B0B0" stroke-width="1"/>
-        <polyline points="${polyPoints.join(' ')}" fill="none" stroke="#C67B2E" stroke-width="2"/>
-        ${circlesSvg}
-        <text x="${padL + plotW / 2}" y="${svgH - 5}" font-size="11" fill="#102A3D" text-anchor="middle" font-weight="bold">AB/2 (m)</text>
-        <text x="15" y="${padT + plotH / 2}" font-size="11" fill="#102A3D" text-anchor="middle" font-weight="bold" transform="rotate(-90 15 ${padT + plotH / 2})">Apparent resistivity ρa (Ω·m)</text>
-      </svg>`;
-    }
-
-    var attachmentsHtml = '<p style="font-size:12px;color:#7B8287;">No attachments.</p>';
-    if (s.attachments && s.attachments.length > 0) {
-      attachmentsHtml = '<div style="display:flex; flex-wrap:wrap; gap:12px;">' +
-        s.attachments.map(function(att) {
-          var src = att.data || att.url || att;
-          var name = att.name || 'Attachment';
-          return '<div style="text-align:center; border:1px solid #D6D0BE; padding:6px; border-radius:4px;">' +
-                   '<img src="' + src + '" style="max-width:180px; max-height:180px; object-fit:contain; display:block; margin-bottom:4px;"/>' +
-                   '<span style="font-size:11px; color:#50575C;">' + esc(name) + '</span>' +
-                 '</div>';
-        }).join('') +
-      '</div>';
-    }
-
-    var htmlContent = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>VES Field Report — ${esc(s.siteName || 'Site')}</title>
-<style>
-  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 30px; color: #1B1E1F; background: #fff; line-height: 1.4; }
-  .print-btn { background: #102A3D; color: #fff; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 20px; font-weight: 600; }
-  .header { border-bottom: 2px solid #102A3D; padding-bottom: 8px; margin-bottom: 16px; }
-  .header h1 { margin: 0; color: #102A3D; font-size: 18px; text-transform: uppercase; letter-spacing: 0.5px; }
-  .header h2 { margin: 4px 0 0; color: #102A3D; font-size: 15px; font-weight: bold; }
-  .sub-id { font-size: 11px; color: #7B8287; margin-top: 2px; }
-  
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 16px; font-size: 13px; }
-  .meta-row { display: flex; margin-bottom: 4px; }
-  .meta-label { width: 110px; color: #50575C; font-weight: 500; }
-  .meta-val { font-weight: 600; color: #102A3D; }
-
-  .section-title { font-size: 13px; font-weight: bold; color: #102A3D; margin: 16px 0 8px; }
-  .remarks-box { font-size: 13px; background: #F6F4EE; padding: 8px 12px; border-radius: 4px; border: 1px solid #D6D0BE; margin-bottom: 16px; }
-
-  .chart-container { width: 100%; max-width: 650px; margin-bottom: 20px; }
-
-  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
-  th, td { border: 1px solid #D6D0BE; padding: 6px 10px; text-align: left; }
-  th { background: #F6F4EE; color: #102A3D; font-weight: bold; font-size: 11px; text-transform: uppercase; }
-  
-  .note-text { font-size: 11px; color: #7B8287; font-style: italic; margin-bottom: 20px; }
-  
-  .signatures { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; }
-  .sig-line { width: 45%; border-top: 1px solid #102A3D; font-size: 11px; color: #50575C; padding-top: 4px; }
-
-  @media print { .print-btn { display: none; } body { margin: 0; } }
-</style>
-</head>
-<body>
-  <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
-
-  <div class="header">
-    <h1>NATIONAL WATER SUPPLY & DRAINAGE BOARD — SRI LANKA</h1>
-    <h2>Vertical Electrical Sounding — Field Report</h2>
-    <div class="sub-id">Chart / VES ID: ${esc(s.chartId || s.vesNo || 'N/A')}</div>
-  </div>
-
-  <div class="meta-grid">
-    <div>
-      <div class="meta-row"><span class="meta-label">Site / location</span><span class="meta-val">${esc(s.siteName || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">VES / station no.</span><span class="meta-val">${esc(s.vesNo || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Date</span><span class="meta-val">${esc(s.date || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Coordinates</span><span class="meta-val">${esc(s.lat || '—')}, ${esc(s.lng || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Office</span><span class="meta-val">—</span></div>
-    </div>
-    <div>
-      <div class="meta-row"><span class="meta-label">Client</span><span class="meta-val">${esc(s.clientName || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Chart / VES ID</span><span class="meta-val">${esc(s.chartId || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Electrode array</span><span class="meta-val">${esc(s.array || 'Schlumberger')}</span></div>
-      <div class="meta-row"><span class="meta-label">Recorded by</span><span class="meta-val">${esc(s.operator || '—')}</span></div>
-      <div class="meta-row"><span class="meta-label">Contact</span><span class="meta-val">—</span></div>
-    </div>
-  </div>
-
-  <div class="section-title">Field remarks:</div>
-  <div class="remarks-box">${esc(s.remarks || 'good')}</div>
-
-  <div class="chart-container">
-    ${chartSvg}
-  </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>AB/2 (m)</th>
-        <th>MN/2 (m)</th>
-        <th>PA (Ω·m)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${readingsRows || '<tr><td colspan="4">No measurement readings recorded.</td></tr>'}
-    </tbody>
-  </table>
-
-  <p class="note-text">Curve and table as recorded in the field. Interpretation of subsurface layering is to be carried out separately by a qualified hydrogeologist.</p>
-
-  <div class="section-title">Attachments</div>
-  ${attachmentsHtml}
-
-  <div class="signatures">
-    <div class="sig-line">Recorded by (name, date)</div>
-    <div class="sig-line">Checked by (name, date)</div>
-  </div>
-</body>
-</html>`;
-
-    var blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
-    var filename = "VES_Report_" + (s.siteName || "Survey").replace(/[^a-z0-9]/gi, '_') + "_" + (s.vesNo || "1") + ".html";
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() { document.body.removeChild(a); }, 300);
-  }
-
-  function exportCsv(){
-    if (!lastRows.length){ setStatus("Nothing loaded to export yet — click Refresh first.", "err"); return; }
-    var lines = ["Chart ID,Site,Client,VES No,Date,Array,Readings Count,Recorded By,Device,Updated"];
-    lastRows.forEach(function(r){
-      lines.push([
-        r.chartId, r.siteName, r.clientName, r.vesNo, r.date, r.array, (r.readings||[]).length, r.operator, r.deviceId,
-        r.updatedAt ? new Date(r.updatedAt).toISOString() : ""
-      ].map(function(v){ return '"' + String(v==null?"":v).replace(/"/g,'""') + '"'; }).join(","));
-    });
-    var blob = new Blob([lines.join("\n")], {type:"text/csv"});
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "ves_all_surveys_" + new Date().toISOString().slice(0,10) + ".csv";
-    document.body.appendChild(a); a.click();
-    setTimeout(function(){ document.body.removeChild(a); }, 300);
-  }
-
-  document.getElementById("connectBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
-  document.getElementById("refreshBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
-  document.getElementById("exportBtn").addEventListener("click", exportCsv);
-
-  loadSaved();
-  if (baseUrlEl.value) fetchSurveys();
-})();
-</script>
-</body>
-</html>
