@@ -12,8 +12,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
 
-// Serve uploaded files publicly so downloaded HTML reports can load images without auth prompts
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Serve uploaded files publicly with automatic URI decoding for spaces and special characters
+app.use("/uploads", (req, res, next) => {
+  try {
+    req.url = decodeURIComponent(req.url);
+  } catch (e) {}
+  next();
+}, express.static(path.join(__dirname, "uploads")));
+
 app.get("/uploads", (req, res) => {
   res.status(200).send("Uploads directory is active.");
 });
