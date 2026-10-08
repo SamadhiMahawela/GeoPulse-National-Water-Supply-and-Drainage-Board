@@ -5,32 +5,29 @@ const cors = require("cors");
 const path = require("path");
 
 const requireApiKey = require("./middleware/auth");
-const surveysRouter = require('./routes/surveys');
+const surveysRouter = require("./routes/surveys");
 
 const app = express();
 
-app.use(cors());               // allow the front-end (any origin/device) to call this API
+app.use(cors());
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
-// Serve static files from root directory
-app.use(express.static(path.join(__dirname)));
+
+// 1. PUBLIC UPLOADS ROUTE (Fixes Sign In Modal & Cannot GET /uploads)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.get('/uploads', (req, res) => {
+  res.status(200).send('Uploads directory is active.');
+});
 
 // Explicit fallback for root index page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ---------------------------------------------------------------------
-// Optional simple login gate for the web pages (the app itself and the
-// admin dashboard) — NOT for the API, which is already protected by the
-// x-api-key header. This is just a username/password prompt your browser
-// shows automatically, so only people you've given the password to can
-// even open the app's web address. It only turns on if you set both
-// APP_USER and APP_PASSWORD in .env — leave them blank to disable it.
-// ---------------------------------------------------------------------
+// Authentication function (requireLogin) remains unchanged
 function requireLogin(req, res, next) {
   const user = process.env.APP_USER;
   const pass = process.env.APP_PASSWORD;
-  if (!user || !pass) return next(); // gate disabled — nothing set
+  if (!user || !pass) return next();
 
   const header = req.headers.authorization || "";
   const token = header.split(" ")[1] || "";
@@ -45,21 +42,18 @@ function requireLogin(req, res, next) {
   return res.status(401).send("Login required.");
 }
 
-// Public health check — no login/API key needed, useful for "is the server up?" checks
+// Public health check
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, time: Date.now() });
 });
 
-// All survey data endpoints require the shared API key (see .env → API_KEY)
+// Survey data endpoints
 app.use("/api/surveys", requireApiKey, surveysRouter);
 
-// The field app itself, served at the site's root address.
-// Anyone who opens this URL gets the same app as the downloadable HTML file —
-// except it's already pointed at this server, so there's nothing to configure.
-app.use("/", requireLogin, express.static(path.join(__dirname, "app")));
+// Serve main app statically
+app.use("/", express.static(path.join(__dirname, "app")));
 
-// A small dashboard at /admin (see public/admin.html) for viewing every
-// survey from every device, behind the same login gate.
+// Keep login protection ONLY for admin dashboard
 app.use("/admin", requireLogin, express.static(path.join(__dirname, "public")));
 
 const PORT = process.env.PORT || 4000;
