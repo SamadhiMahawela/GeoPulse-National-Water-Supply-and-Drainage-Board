@@ -26,6 +26,8 @@
   #status.ok{color:#2F6E4E;}
   .pill{display:inline-block;background:#EEEADC;border-radius:20px;padding:1px 8px;font-size:11px;}
   .empty{padding:30px;text-align:center;color:#7B8287;}
+  .btn-report{display:inline-block;padding:4px 8px;background:#0056b3;color:#fff;text-decoration:none;border-radius:4px;font-size:11px;white-space:nowrap;}
+  .btn-report:hover{background:#004085;}
 </style>
 </head>
 <body>
@@ -102,10 +104,13 @@
 
   function renderTable(rows){
     if (!rows.length){ tableHost.innerHTML = '<div class="empty">No surveys on this server yet.</div>'; return; }
+    var base = baseUrlEl.value.trim().replace(/\/+$/,"");
     var html = '<table><thead><tr>' +
-      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th>' +
+      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th><th>Action</th>' +
       '</tr></thead><tbody>';
     rows.forEach(function(r){
+      var reportId = r.id || r.chartId || "";
+      var reportUrl = "index.html?surveyId=" + encodeURIComponent(reportId);
       html += '<tr>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc(r.chartId||"—")+'</td>' +
         '<td>'+esc(r.siteName||"—")+'</td>' +
@@ -118,6 +123,7 @@
         '<td>'+esc(r.operator||"—")+'</td>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc((r.deviceId||"").slice(0,10))+'</td>' +
         '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
+        '<td><a href="' + reportUrl + '" target="_blank" class="btn-report">📄 View Report</a></td>' +
       '</tr>';
     });
     html += '</tbody></table>';
