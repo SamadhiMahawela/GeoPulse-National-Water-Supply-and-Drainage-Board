@@ -135,16 +135,6 @@
     });
   }
 
-  function resolveImageUrl(rawSrc, serverBase) {
-    if (!rawSrc) return '';
-    if (rawSrc.startsWith('data:') || rawSrc.startsWith('http://') || rawSrc.startsWith('https://')) {
-      return rawSrc;
-    }
-    var cleanBase = serverBase.replace(/\/+$/, "");
-    var path = rawSrc.startsWith('/') ? rawSrc : '/' + rawSrc;
-    return cleanBase + path;
-  }
-
   function downloadStandaloneReport(s) {
     var serverBase = baseUrlEl.value.trim().replace(/\/+$/,"");
 
@@ -226,33 +216,32 @@
       </svg>`;
     }
 
-    // 3. Resolve Attachments with Server Fallback Base & URL Encoding
+    // 3. Resolve Attachments with Server Base & Filename Extraction
     var attachmentsHtml = '<p style="font-size:12px;color:#7B8287;">No attachments.</p>';
     if (s.attachments && s.attachments.length > 0) {
       attachmentsHtml = '<div style="display:flex; flex-wrap:wrap; gap:12px;">' +
         s.attachments.map(function(att) {
-          var name = att.name || (typeof att === 'string' ? att : 'Attachment');
-          var rawPath = att.data || att.url || att.path || att.filename || (typeof att === 'string' ? att : '');
-          
-          if (!rawPath.startsWith('data:') && !rawPath.startsWith('http')) {
-            if (!rawPath.includes('/')) {
-              rawPath = '/uploads/' + rawPath;
-            }
+          var filename = '';
+          if (typeof att === 'string') {
+            filename = att;
+          } else if (att) {
+            filename = att.filename || att.name || att.path || att.url || att.data || '';
           }
-          
-          var baseUrl = resolveImageUrl(rawPath, serverBase);
-          
-          // Encodes spaces/special chars in URL (e.g. "download (11).jpg" -> "download%20(11).jpg")
-          var parts = baseUrl.split('/');
-          var finalUrl = parts.map(function(part, i) {
-            return i < 3 ? part : encodeURIComponent(part);
-          }).join('/');
+
+          if (!filename) return '';
+
+          if (filename.includes('/')) {
+            filename = filename.split('/').pop();
+          }
+
+          var finalUrl = serverBase + '/uploads/' + encodeURIComponent(filename);
+          var displayName = (att && att.name) ? att.name : filename;
 
           return '<div style="text-align:center; border:1px solid #D6D0BE; padding:8px; border-radius:4px; background:#fafafa; max-width:200px;">' +
                    '<a href="' + esc(finalUrl) + '" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">' +
-                     '<img src="' + esc(finalUrl) + '" alt="' + esc(name) + '" style="max-width:180px; max-height:180px; object-fit:contain; display:block; margin:0 auto 6px; border:1px solid #E0E0E0; background:#fff;"/>' +
+                     '<img src="' + esc(finalUrl) + '" alt="' + esc(displayName) + '" style="max-width:180px; max-height:180px; object-fit:contain; display:block; margin:0 auto 6px; border:1px solid #E0E0E0; background:#fff;"/>' +
                    '</a>' +
-                   '<span style="font-size:11px; color:#50575C; word-break:break-all;">' + esc(name) + '</span>' +
+                   '<span style="font-size:11px; color:#50575C; word-break:break-all;">' + esc(displayName) + '</span>' +
                  '</div>';
         }).join('') +
       '</div>';
