@@ -11,6 +11,7 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
+app.use(express.static(path.join(__dirname)));
 
 // Serve uploaded files publicly with automatic URI decoding for spaces and special characters
 app.use("/uploads", (req, res, next) => {

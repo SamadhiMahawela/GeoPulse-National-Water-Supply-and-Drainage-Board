@@ -1,23 +1,28 @@
-// db.js — opens (and creates, if missing) the SQLite database file and
-// makes sure the "surveys" table exists. better-sqlite3 is synchronous,
-// which keeps the rest of the code simple (no async/await needed just to
-// talk to the database).
+// db.js — connects to Railway's Postgres database and makes sure the
+// "surveys" table exists. Everything else in the app talks to the database
+// only through db.query(...), so this is the one file that knows it's Postgres.
 
-const path = require("path");
-const fs = require("fs");
-const Database = require("better-sqlite3");
+const { Pool } = require("pg");
 
-const DB_PATH = process.env.DB_PATH || path.join(__dirname, "data", "ves.db");
+const connectionString = "postgresql://postgres:YOUR_PASSWORD@YOUR_PUBLIC_HOST.proxy.rlwy.net:PORT/railway";
 
-// make sure the folder for the database file exists
-fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+if (!connectionString) {
+  console.error(
+    "Missing DATABASE_URL. Add a Postgres database in Railway and set " +
+    "DATABASE_URL in this service's Variables (see backend/README.md)."
+  );
+}
 
-const db = new Database(DB_PATH);
+// Railway's public Postgres connection needs SSL; a plain local Postgres on
+// your own laptop usually doesn't. This just guesses sensibly from the URL.
+const isLocal = /localhost|127\.0\.0\.1/.test(connectionString || "");
 
-// WAL mode = better performance with multiple devices reading/writing at once
-db.pragma("journal_mode = WAL");
+const pool = new Pool({
+    connectionString: "postgresql://postgres:YOUR_PASSWORD@YOUR_HOST.proxy.rlwy.net:PORT/railway",
+    ssl: { rejectUnauthorized: false }
+});
 
-db.exec(`
+const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS surveys (
     id          TEXT PRIMARY KEY,
     site_name   TEXT,
@@ -30,27 +35,27 @@ db.exec(`
     operator    TEXT,
     array_type  TEXT,
     remarks     TEXT,
-    readings    TEXT,    -- JSON array of {ab2, mn2, rho}, stored as text
-    attachments TEXT,    -- JSON array of {name, kind, mime, size, dataUrl, includeInReport}, stored as text
-    created_at  INTEGER,
-    updated_at  INTEGER,
+    readings    JSONB DEFAULT '[]'::jsonb,
+    attachments JSONB DEFAULT '[]'::jsonb,
+    created_at  BIGINT,
+    updated_at  BIGINT,
     device_id   TEXT
   );
 
   CREATE INDEX IF NOT EXISTS idx_surveys_updated_at ON surveys(updated_at);
-`);
+`;
 
-// Lightweight migration: add columns that didn't exist in earlier versions
-// of this schema, so upgrading in place doesn't lose an existing database.
-var existingCols = db.prepare("PRAGMA table_info(surveys)").all().map(function(c){ return c.name; });
-if (existingCols.indexOf("client_name") === -1) {
-  db.exec("ALTER TABLE surveys ADD COLUMN client_name TEXT");
-}
-if (existingCols.indexOf("chart_id") === -1) {
-  db.exec("ALTER TABLE surveys ADD COLUMN chart_id TEXT");
-}
-if (existingCols.indexOf("attachments") === -1) {
-  db.exec("ALTER TABLE surveys ADD COLUMN attachments TEXT");
-}
+// Runs once when the server starts. server.js waits for this before it
+// starts accepting requests, so nothing hits the database before the table
+// exists.
+const ready = pool.query(SCHEMA_SQL)
+  .then(() => console.log("Database ready (surveys table checked/created)."))
+  .catch((err) => {
+    console.error("Could not set up the database:", err.message);
+    throw err;
+  });
 
-module.exports = db;
+module.exports = {
+  query: (text, params) => pool.query(text, params),
+  ready
+};
