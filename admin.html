@@ -26,8 +26,8 @@
   #status.ok{color:#2F6E4E;}
   .pill{display:inline-block;background:#EEEADC;border-radius:20px;padding:1px 8px;font-size:11px;}
   .empty{padding:30px;text-align:center;color:#7B8287;}
-  .btn-report{display:inline-block;padding:4px 8px;background:#0056b3;color:#fff;text-decoration:none;border-radius:4px;font-size:11px;white-space:nowrap;}
-  .btn-report:hover{background:#004085;}
+  .btn-download{display:inline-block;padding:4px 8px;background:#1C6E76;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;}
+  .btn-download:hover{background:#102A3D;}
 </style>
 </head>
 <body>
@@ -104,13 +104,10 @@
 
   function renderTable(rows){
     if (!rows.length){ tableHost.innerHTML = '<div class="empty">No surveys on this server yet.</div>'; return; }
-    var base = baseUrlEl.value.trim().replace(/\/+$/,"");
     var html = '<table><thead><tr>' +
-      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th><th>Action</th>' +
+      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th><th>Download Report</th>' +
       '</tr></thead><tbody>';
-    rows.forEach(function(r){
-      var reportId = r.id || r.chartId || "";
-      var reportUrl = "index.html?surveyId=" + encodeURIComponent(reportId);
+    rows.forEach(function(r, index){
       html += '<tr>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc(r.chartId||"—")+'</td>' +
         '<td>'+esc(r.siteName||"—")+'</td>' +
@@ -123,11 +120,101 @@
         '<td>'+esc(r.operator||"—")+'</td>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc((r.deviceId||"").slice(0,10))+'</td>' +
         '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
-        '<td><a href="' + reportUrl + '" target="_blank" class="btn-report">📄 View Report</a></td>' +
+        '<td><button class="btn-download" data-index="' + index + '">📥 Download HTML Report</button></td>' +
       '</tr>';
     });
     html += '</tbody></table>';
     tableHost.innerHTML = html;
+
+    // Attach click listeners to all download buttons
+    var btns = tableHost.querySelectorAll('.btn-download');
+    btns.forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var idx = parseInt(btn.getAttribute('data-index'), 10);
+        if (lastRows[idx]) downloadStandaloneReport(lastRows[idx]);
+      });
+    });
+  }
+
+  function downloadStandaloneReport(s){
+    var readingsRows = (s.readings || []).map(function(rd){
+      return '<tr>' +
+        '<td>' + esc(rd.ab2 || rd.ab_2 || '') + '</td>' +
+        '<td>' + esc(rd.mn2 || rd.mn_2 || '') + '</td>' +
+        '<td>' + esc(rd.k || '') + '</td>' +
+        '<td>' + esc(rd.r || rd.resistance || '') + '</td>' +
+        '<td>' + esc(rd.pa || rd.rho || '') + '</td>' +
+      '</tr>';
+    }).join('');
+
+    var htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>VES Survey Report - ${esc(s.siteName || 'Site')} (${esc(s.vesNo || '')})</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 30px; color: #1B1E1F; background: #fff; }
+  .header { border-bottom: 2px solid #102A3D; padding-bottom: 12px; margin-bottom: 20px; }
+  .header h1 { margin: 0; color: #102A3D; font-size: 22px; }
+  .header h2 { margin: 4px 0 0; color: #1C6E76; font-size: 14px; font-weight: normal; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+  .box { background: #F6F4EE; padding: 12px; border-radius: 6px; border: 1px solid #D6D0BE; }
+  .box strong { color: #102A3D; }
+  table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+  th, td { border: 1px solid #D6D0BE; padding: 6px 10px; text-align: left; }
+  th { background: #102A3D; color: #fff; text-transform: uppercase; font-size: 11px; }
+  tr:nth-child(even) { background: #F9F9F9; }
+  .print-btn { background: #102A3D; color: #fff; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 20px; }
+  @media print { .print-btn { display: none; } }
+</style>
+</head>
+<body>
+  <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <div class="header">
+    <h1>National Water Supply & Drainage Board — Sri Lanka</h1>
+    <h2>Vertical Electrical Sounding (VES) Field Survey Report</h2>
+  </div>
+  <div class="grid">
+    <div class="box">
+      <p><strong>Site Name:</strong> ${esc(s.siteName || 'N/A')}</p>
+      <p><strong>Client Name:</strong> ${esc(s.clientName || 'N/A')}</p>
+      <p><strong>VES Station No:</strong> ${esc(s.vesNo || 'N/A')}</p>
+      <p><strong>Array Type:</strong> ${esc(s.array || 'Schlumberger')}</p>
+    </div>
+    <div class="box">
+      <p><strong>Date:</strong> ${esc(s.date || 'N/A')}</p>
+      <p><strong>Chart ID:</strong> ${esc(s.chartId || 'N/A')}</p>
+      <p><strong>Recorded By:</strong> ${esc(s.operator || 'N/A')}</p>
+      <p><strong>GPS Location:</strong> ${esc(s.lat || '—')}, ${esc(s.lng || '—')}</p>
+    </div>
+  </div>
+
+  <h3>Field Measurements & Apparent Resistivity</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>AB/2 (m)</th>
+        <th>MN/2 (m)</th>
+        <th>Geometric Factor (K)</th>
+        <th>Resistance (Ω)</th>
+        <th>Apparent Resistivity ρa (Ω·m)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${readingsRows || '<tr><td colspan="5">No measurement readings saved for this survey.</td></tr>'}
+    </tbody>
+  </table>
+</body>
+</html>`;
+
+    var blob = new Blob([htmlContent], { type: "text/html;charset=utf-8" });
+    var filename = "VES_Report_" + (s.siteName || "Survey").replace(/[^a-z0-9]/gi, '_') + "_" + (s.vesNo || "1") + ".html";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); }, 300);
   }
 
   function exportCsv(){
