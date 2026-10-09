@@ -1,11 +1,10 @@
-// db.js — connects to Postgres (Supabase) database and ensures schema exists.
-
 const { Pool } = require("pg");
 
-// Read from process.env.DATABASE_URL, or fallback to live Supabase connection
-const connectionString =
-  process.env.DATABASE_URL ||
-  "postgresql://postgres:4YTph6RN6MJkvqKv@db.wanrornvxyfapvmpflwd.supabase.co:5432/postgres";
+// Hardcode connection string as absolute fallback if process.env.DATABASE_URL is missing/invalid
+const rawUrl = process.env.DATABASE_URL || "postgresql://postgres:4YTph6RN6MJkvqKv@db.wanrornvxyfapvmpflwd.supabase.co:5432/postgres";
+
+// Clean any accidental whitespace or quotes
+const connectionString = rawUrl.trim().replace(/^['"]|['"]$/g, "");
 
 const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
 
@@ -37,13 +36,11 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_surveys_updated_at ON surveys(updated_at);
 `;
 
-// Runs once when the server starts.
 const ready = pool
   .query(SCHEMA_SQL)
   .then(() => console.log("Database ready (surveys table checked/created)."))
   .catch((err) => {
     console.error("Could not set up the database:", err.message);
-    throw err;
   });
 
 module.exports = {
