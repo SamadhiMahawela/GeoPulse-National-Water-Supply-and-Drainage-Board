@@ -12,6 +12,26 @@
       "dest": "/styles.css"
     },
     {
+      "src": "/app.js",
+      "dest": "/app.js"
+    },
+    {
+      "src": "/manifest.json",
+      "dest": "/manifest.json"
+    },
+    {
+      "src": "/sw.js",
+      "dest": "/sw.js"
+    },
+    {
+      "src": "/service-worker.js",
+      "dest": "/service-worker.js"
+    },
+    {
+      "src": "/icon-512.png",
+      "dest": "/icon-512.png"
+    },
+    {
       "src": "/(.*)",
       "dest": "server.js"
     }

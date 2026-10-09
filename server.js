@@ -15,9 +15,25 @@ app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
 // Explicit static file serving from root directory
 app.use(express.static(path.join(__dirname)));
 
-// Serve styles.css explicitly to prevent 404/routing issues on Vercel
+// Explicit static asset routes to prevent Vercel 404 routing issues
 app.get("/styles.css", (req, res) => {
   res.sendFile(path.join(__dirname, "styles.css"));
+});
+
+app.get("/app.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "app.js"));
+});
+
+app.get("/manifest.json", (req, res) => {
+  res.sendFile(path.join(__dirname, "manifest.json"));
+});
+
+app.get("/sw.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "sw.js"));
+});
+
+app.get("/service-worker.js", (req, res) => {
+  res.sendFile(path.join(__dirname, "service-worker.js"));
 });
 
 // Serve uploaded files publicly with automatic URI decoding
