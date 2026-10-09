@@ -1,25 +1,17 @@
-// db.js — connects to Railway's Postgres database and makes sure the
-// "surveys" table exists. Everything else in the app talks to the database
-// only through db.query(...), so this is the one file that knows it's Postgres.
+// db.js — connects to Postgres (Supabase) database and ensures schema exists.
 
 const { Pool } = require("pg");
 
-const connectionString = "postgresql://postgres:YOUR_PASSWORD@YOUR_PUBLIC_HOST.proxy.rlwy.net:PORT/railway";
+// Read from process.env.DATABASE_URL, or fallback to live Supabase connection
+const connectionString =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:4YTph6RN6MJkvqKv@db.wanrornvxyfapvmpflwd.supabase.co:5432/postgres";
 
-if (!connectionString) {
-  console.error(
-    "Missing DATABASE_URL. Add a Postgres database in Railway and set " +
-    "DATABASE_URL in this service's Variables (see backend/README.md)."
-  );
-}
-
-// Railway's public Postgres connection needs SSL; a plain local Postgres on
-// your own laptop usually doesn't. This just guesses sensibly from the URL.
-const isLocal = /localhost|127\.0\.0\.1/.test(connectionString || "");
+const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
 
 const pool = new Pool({
-    connectionString: "postgresql://postgres:YOUR_PASSWORD@YOUR_HOST.proxy.rlwy.net:PORT/railway",
-    ssl: { rejectUnauthorized: false }
+  connectionString: connectionString,
+  ssl: isLocal ? false : { rejectUnauthorized: false }
 });
 
 const SCHEMA_SQL = `
@@ -45,10 +37,9 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_surveys_updated_at ON surveys(updated_at);
 `;
 
-// Runs once when the server starts. server.js waits for this before it
-// starts accepting requests, so nothing hits the database before the table
-// exists.
-const ready = pool.query(SCHEMA_SQL)
+// Runs once when the server starts.
+const ready = pool
+  .query(SCHEMA_SQL)
   .then(() => console.log("Database ready (surveys table checked/created)."))
   .catch((err) => {
     console.error("Could not set up the database:", err.message);
