@@ -1,9 +1,11 @@
 const { Pool } = require("pg");
 
-// Hardcode connection string as absolute fallback if process.env.DATABASE_URL is missing/invalid
-const rawUrl = process.env.DATABASE_URL || "postgresql://postgres:4YTph6RN6MJkvqKv@db.wanrornvxyfapvmpflwd.supabase.co:5432/postgres";
+// Get raw connection string from environment or use direct fallback
+const rawUrl =
+  process.env.DATABASE_URL ||
+  "postgresql://postgres:4YTph6RN6MJkvqKv@db.wanrornvxyfapvmpflwd.supabase.co:5432/postgres";
 
-// Clean any accidental whitespace or quotes
+// Sanitize connection string to avoid ERR_INVALID_URL errors
 const connectionString = rawUrl.trim().replace(/^['"]|['"]$/g, "");
 
 const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);

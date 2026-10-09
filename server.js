@@ -11,26 +11,37 @@ const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
+
+// Explicit static file serving from root directory
 app.use(express.static(path.join(__dirname)));
 
-// Serve uploaded files publicly with automatic URI decoding for spaces and special characters
-app.use("/uploads", (req, res, next) => {
-  try {
-    req.url = decodeURIComponent(req.url);
-  } catch (e) {}
-  next();
-}, express.static(path.join(__dirname, "uploads")));
+// Serve styles.css explicitly to prevent 404/routing issues on Vercel
+app.get("/styles.css", (req, res) => {
+  res.sendFile(path.join(__dirname, "styles.css"));
+});
+
+// Serve uploaded files publicly with automatic URI decoding
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    try {
+      req.url = decodeURIComponent(req.url);
+    } catch (e) {}
+    next();
+  },
+  express.static(path.join(__dirname, "uploads"))
+);
 
 app.get("/uploads", (req, res) => {
   res.status(200).send("Uploads directory is active.");
 });
 
-// Explicit fallback for root index page
+// Explicit route for index page
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
 
-// Authentication function for Admin routes
+// Basic Auth middleware for Admin routes
 function requireLogin(req, res, next) {
   const user = process.env.APP_USER;
   const pass = process.env.APP_PASSWORD;
@@ -54,13 +65,10 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, time: Date.now() });
 });
 
-// Survey data endpoints protected by API key
+// Survey data endpoints
 app.use("/api/surveys", requireApiKey, surveysRouter);
 
-// Serve main app statically from root
-app.use("/", express.static(path.join(__dirname)));
-
-// Admin portal protected by username/password
+// Admin portal protected routes
 app.get("/admin.html", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
@@ -69,7 +77,7 @@ app.get("/admin", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
-// Only listen on a port when running locally (not on Vercel)
+// Listen locally when not running on Vercel
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, () => {
@@ -77,5 +85,5 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// CRITICAL FOR VERCEL: Export the Express app instance
+// Export Express app instance for Vercel Serverless Function execution
 module.exports = app;

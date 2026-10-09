@@ -12,10 +12,6 @@
       "dest": "/styles.css"
     },
     {
-      "src": "/(.*\\.(js|png|jpg|jpeg|svg|ico|json))",
-      "dest": "/$1"
-    },
-    {
       "src": "/(.*)",
       "dest": "server.js"
     }
