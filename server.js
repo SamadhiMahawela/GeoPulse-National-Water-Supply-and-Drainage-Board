@@ -69,7 +69,13 @@ app.get("/admin", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log("VES backend listening on port " + PORT);
-});
+// Only listen on a port when running locally (not on Vercel)
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT || 4000;
+  app.listen(PORT, () => {
+    console.log("VES backend listening on port " + PORT);
+  });
+}
+
+// CRITICAL FOR VERCEL: Export the Express app instance
+module.exports = app;
