@@ -1,11 +1,5 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "server.js",
-      "use": "@vercel/node"
-    }
-  ],
   "routes": [
     {
       "src": "/styles.css",
@@ -28,12 +22,16 @@
       "dest": "/service-worker.js"
     },
     {
+      "src": "/icon-192.png",
+      "dest": "/icon-192.png"
+    },
+    {
       "src": "/icon-512.png",
       "dest": "/icon-512.png"
     },
     {
       "src": "/(.*)",
-      "dest": "server.js"
+      "dest": "/server.js"
     }
   ]
 }

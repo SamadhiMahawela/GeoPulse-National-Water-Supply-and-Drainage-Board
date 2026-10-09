@@ -12,31 +12,17 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: process.env.BODY_LIMIT || "20mb" }));
 
-// Explicit static file serving from root directory
+// Serve static assets from the root directory
 app.use(express.static(path.join(__dirname)));
 
-// Explicit static asset routes to prevent Vercel 404 routing issues
-app.get("/styles.css", (req, res) => {
-  res.sendFile(path.join(__dirname, "styles.css"));
-});
+// Explicit static routes so Vercel serverless function serves root files directly
+app.get("/styles.css", (req, res) => res.sendFile(path.join(__dirname, "styles.css")));
+app.get("/app.js", (req, res) => res.sendFile(path.join(__dirname, "app.js")));
+app.get("/manifest.json", (req, res) => res.sendFile(path.join(__dirname, "manifest.json")));
+app.get("/sw.js", (req, res) => res.sendFile(path.join(__dirname, "sw.js")));
+app.get("/service-worker.js", (req, res) => res.sendFile(path.join(__dirname, "service-worker.js")));
 
-app.get("/app.js", (req, res) => {
-  res.sendFile(path.join(__dirname, "app.js"));
-});
-
-app.get("/manifest.json", (req, res) => {
-  res.sendFile(path.join(__dirname, "manifest.json"));
-});
-
-app.get("/sw.js", (req, res) => {
-  res.sendFile(path.join(__dirname, "sw.js"));
-});
-
-app.get("/service-worker.js", (req, res) => {
-  res.sendFile(path.join(__dirname, "service-worker.js"));
-});
-
-// Serve uploaded files publicly with automatic URI decoding
+// Serve uploads directory with URI decoding
 app.use(
   "/uploads",
   (req, res, next) => {
@@ -52,7 +38,7 @@ app.get("/uploads", (req, res) => {
   res.status(200).send("Uploads directory is active.");
 });
 
-// Explicit route for index page
+// Serve root index page
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -81,7 +67,7 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true, time: Date.now() });
 });
 
-// Survey data endpoints
+// Survey endpoints
 app.use("/api/surveys", requireApiKey, surveysRouter);
 
 // Admin portal protected routes
@@ -93,7 +79,7 @@ app.get("/admin", requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "admin.html"));
 });
 
-// Listen locally when not running on Vercel
+// Local development server listener
 if (process.env.NODE_ENV !== "production") {
   const PORT = process.env.PORT || 4000;
   app.listen(PORT, () => {
@@ -101,5 +87,4 @@ if (process.env.NODE_ENV !== "production") {
   });
 }
 
-// Export Express app instance for Vercel Serverless Function execution
 module.exports = app;
