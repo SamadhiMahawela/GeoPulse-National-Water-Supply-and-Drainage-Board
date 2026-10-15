@@ -1,0 +1,16 @@
+{
+  "name": "VES Field Tool",
+  "short_name": "VES Tool",
+  "description": "Vertical Electrical Sounding data capture, charting and reporting for field hydrogeology teams.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F6F4EE",
+  "theme_color": "#102A3D",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

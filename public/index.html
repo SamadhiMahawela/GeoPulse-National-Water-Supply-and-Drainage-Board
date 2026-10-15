@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VES Field Tool — Sounding Chart &amp; Report</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#102A3D">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VES Tool">
+</head>
+<body>
+<div class="shell">
+
+  <header class="appbar">
+    <img class="logo" id="hdrLogo" alt="Office logo" src="" style="display:none;">
+    <div class="titles">
+      <div class="org" id="hdrOrg">National Water Supply &amp; Drainage Board — Sri Lanka</div>
+      <div class="app-title">VES Field Tool</div>
+    </div>
+    <span class="conn-badge" id="connBadge" style="display:none;">● Offline</span>
+    <button class="iconbtn" id="themeToggleBtn" title="Toggle theme">◐</button>
+  </header>
+
+  <main>
+
+    <!-- ================= SURVEY TAB ================= -->
+    <section class="panel active" id="panel-survey">
+
+      <h2 class="section-title">Site &amp; survey information</h2>
+      <div class="card">
+        <div class="field">
+          <label for="f_siteName">Site / location name</label>
+          <input type="text" id="f_siteName" placeholder="e.g. Ihala Kottaramulla, Gampaha">
+        </div>
+        <div class="field">
+          <label for="f_clientName">Client name</label>
+          <input type="text" id="f_clientName" placeholder="e.g. Mr. Perera / Divisional Secretariat, Wattala">
+        </div>
+        <div class="field">
+          <label for="f_chartId">Chart ID (auto, unique to this VES)</label>
+          <input type="text" id="f_chartId" readonly>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="f_lat">Latitude</label>
+            <input type="text" id="f_lat" inputmode="decimal" placeholder="7.1234">
+          </div>
+          <div class="field">
+            <label for="f_lng">Longitude</label>
+            <input type="text" id="f_lng" inputmode="decimal" placeholder="79.9876">
+          </div>
+        </div>
+        <button class="btn secondary small" id="gpsBtn" type="button">📍 Capture GPS location</button>
+        <div class="row2" style="margin-top:10px;">
+          <div class="field">
+            <label for="f_date">Date</label>
+            <input type="date" id="f_date">
+          </div>
+          <div class="field">
+            <label for="f_vesNo">VES / Station no.</label>
+            <input type="text" id="f_vesNo" placeholder="VES-01">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="f_operator">Recorded by</label>
+            <input type="text" id="f_operator" placeholder="Name, designation">
+          </div>
+          <div class="field">
+            <label for="f_array">Electrode array</label>
+            <select id="f_array">
+              <option value="Schlumberger">Schlumberger</option>
+              <option value="Wenner">Wenner</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f_remarks">Field remarks</label>
+          <textarea id="f_remarks" placeholder="Ground conditions, access, interference, nearby wells etc."></textarea>
+        </div>
+      </div>
+
+      <h2 class="section-title">Sounding readings</h2>
+      <div class="card">
+        <table class="data-tbl" id="readingsTable">
+          <thead>
+            <tr>
+              <th class="idx">#</th>
+              <th>AB/2 (m)</th>
+              <th>MN/2 (m)</th>
+              <th>App. resistivity ρa (Ω·m)</th>
+              <th class="actions-h"></th>
+            </tr>
+          </thead>
+          <tbody id="readingsBody"></tbody>
+        </table>
+        <div class="btnrow">
+          <button class="btn secondary small" id="addRowBtn" type="button">+ Add row</button>
+          <button class="btn secondary small" id="add5RowBtn" type="button">+ Add 5 rows</button>
+          <button class="btn ghost small" id="clearRowsBtn" type="button">Clear all</button>
+        </div>
+        <div class="btnrow">
+          <button class="btn secondary small" id="saveTxtBtn" type="button">⬇ Save table as text file</button>
+        </div>
+        <div id="qcNote"></div>
+      </div>
+
+      <h2 class="section-title">Sounding curve (log–log)</h2>
+      <div class="chart-wrap">
+        <div id="chartHost"></div>
+      </div>
+      <div class="chart-legend">AB/2 (m) — horizontal · apparent resistivity ρa (Ω·m) — vertical · both log scale</div>
+
+      <h2 class="section-title">Photos &amp; files</h2>
+      <div class="card">
+        <div class="note">Attach site photos, instrument printouts, or any other files. Tick <strong>"Include in report"</strong>
+          on the ones that should appear on the printed report — the rest stay saved with this survey only.</div>
+        <label class="filebtn" for="fileUploadInput">
+          <input type="file" id="fileUploadInput" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx">
+          📎 Choose files to upload
+        </label>
+        <div id="attachmentsList"></div>
+        <div class="note" id="attachStorageNote" style="margin-top:8px;"></div>
+      </div>
+
+      <div class="btnrow" style="margin-top:16px;">
+        <button class="btn block" id="saveSurveyBtn" type="button">💾 Save survey</button>
+      </div>
+      <div class="btnrow">
+        <button class="btn secondary" id="newSurveyBtn" type="button">＋ New / clear form</button>
+      </div>
+    </section>
+
+    <!-- ================= REPORT TAB ================= -->
+    <section class="panel" id="panel-report">
+      <h2 class="section-title">Report preview</h2>
+      <div class="note">This preview mirrors what will print. Use your browser's Print dialog (or "Save as PDF") to generate a PDF copy for the office file.</div>
+      <div class="btnrow no-print" style="margin:8px 0 14px;">
+        <button class="btn" id="printBtn" type="button">🖨️ Print / Save as PDF</button>
+      </div>
+
+      <div id="reportPrintArea">
+        <div class="report-page" id="reportPage"></div>
+      </div>
+    </section>
+
+    <!-- ================= SAVED TAB ================= -->
+    <section class="panel" id="panel-saved">
+      <h2 class="section-title">Saved surveys</h2>
+      <div class="field">
+        <input type="text" id="searchSaved" placeholder="Search by site name, VES no. or date">
+      </div>
+      <div id="savedList"></div>
+    </section>
+
+    <!-- ================= TOOLS TAB ================= -->
+    <section class="panel" id="panel-tools">
+
+      <h2 class="section-title">Office / letterhead profile</h2>
+      <div class="card">
+        <div class="field">
+          <label for="p_org">Organisation name</label>
+          <input type="text" id="p_org">
+        </div>
+        <div class="field">
+          <label for="p_office">Regional / area office</label>
+          <input type="text" id="p_office" placeholder="e.g. NWSDB Regional Support Centre, Gampaha">
+        </div>
+        <div class="field">
+          <label for="p_contact">Office contact</label>
+          <input type="text" id="p_contact" placeholder="Phone / email">
+        </div>
+        <div class="field">
+          <label>Office logo (used on app header &amp; report letterhead)</label>
+          <div class="logo-picker">
+            <img id="profileLogoPreview" src="" alt="">
+            <input type="file" id="logoInput" accept="image/*">
+          </div>
+        </div>
+        <button class="btn secondary small" id="saveProfileBtn" type="button">Save profile</button>
+      </div>
+
+      <h2 class="section-title">Server sync — share data across devices</h2>
+      <div class="card">
+        <div class="note">Optional. Connect this device to your team's shared database so surveys saved on
+          any phone/laptop show up for everyone. Leave this blank to keep using this device only, offline.</div>
+        <div class="field">
+          <label for="s_baseUrl">Server URL</label>
+          <input type="text" id="s_baseUrl" placeholder="https://your-ves-server.onrender.com">
+        </div>
+        <div class="field">
+          <label for="s_apiKey">API key</label>
+          <input type="text" id="s_apiKey" placeholder="Given to you by whoever set up the server">
+        </div>
+        <div class="btnrow">
+          <button class="btn secondary small" id="saveSyncBtn" type="button">Save connection</button>
+          <button class="btn ghost small" id="testSyncBtn" type="button">Test connection</button>
+        </div>
+        <div id="syncStatus" class="note" style="display:none;margin-top:10px;"></div>
+        <hr class="sep">
+        <div class="btnrow">
+          <button class="btn secondary small" id="pushAllBtn" type="button">⬆ Push all local surveys to server</button>
+          <button class="btn secondary small" id="pullAllBtn" type="button">⬇ Pull latest from server</button>
+        </div>
+        <div class="note" id="lastSyncNote" style="margin-top:8px;"></div>
+        <div class="note" style="margin-top:8px;">This device's ID: <span class="k" id="deviceIdDisplay"></span> — shown against each survey on the server so you can tell which device recorded it.</div>
+      </div>
+
+      <h2 class="section-title">Field reading → apparent resistivity calculator</h2>
+      <div class="card">
+        <div class="note">Optional helper. If your instrument gives raw current (I) and voltage (ΔV) instead of ready resistivity, use this to compute ρa, then copy the value into the readings table.</div>
+        <div class="field">
+          <label for="c_array">Array type</label>
+          <select id="c_array">
+            <option value="Schlumberger">Schlumberger</option>
+            <option value="Wenner">Wenner</option>
+          </select>
+        </div>
+        <div class="row3">
+          <div class="field">
+            <label for="c_ab2">AB/2 (m)</label>
+            <input type="number" id="c_ab2" step="any">
+          </div>
+          <div class="field" id="c_mn2wrap">
+            <label for="c_mn2">MN/2 (m)</label>
+            <input type="number" id="c_mn2" step="any">
+          </div>
+          <div class="field" style="display:none" id="c_awrap">
+            <label for="c_a">Spacing a (m)</label>
+            <input type="number" id="c_a" step="any">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label for="c_i">Current I (mA)</label>
+            <input type="number" id="c_i" step="any">
+          </div>
+          <div class="field">
+            <label for="c_v">Voltage ΔV (mV)</label>
+            <input type="number" id="c_v" step="any">
+          </div>
+        </div>
+        <div class="btnrow">
+          <button class="btn secondary small" id="calcBtn" type="button">Calculate ρa</button>
+        </div>
+        <div id="calcResult" class="note" style="display:none;"></div>
+      </div>
+
+      <h2 class="section-title">Import / export data</h2>
+      <div class="card">
+        <div class="field">
+          <label for="csvPaste">Paste AB/2, ρa pairs (comma, tab or space separated — one pair per line)</label>
+          <textarea id="csvPaste" placeholder="1, 12.4&#10;2, 15.1&#10;4, 22.0"></textarea>
+        </div>
+        <div class="btnrow">
+          <button class="btn secondary small" id="importPasteBtn" type="button">Import into current survey</button>
+        </div>
+        <hr class="sep">
+        <div class="btnrow">
+          <button class="btn secondary small" id="exportCsvBtn" type="button">⬇ Export current survey as CSV</button>
+          <button class="btn secondary small" id="exportJsonAllBtn" type="button">⬇ Export ALL surveys (JSON backup)</button>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label for="jsonImportFile">Import surveys from a JSON backup file</label>
+          <input type="file" id="jsonImportFile" accept="application/json">
+        </div>
+      </div>
+
+      <h2 class="section-title">About this tool</h2>
+      <div class="card">
+        <p style="font-size:13px;line-height:1.5;margin:0 0 8px;">
+          Built for field use by hydrogeologists, drillers, technical officers and engineers carrying out
+          Vertical Electrical Sounding (VES) surveys. It records AB/2 and apparent resistivity readings,
+          plots the standard log–log sounding curve, flags possible reading errors, and produces a printable
+          field report. It does <strong>not</strong> auto-interpret layer resistivity, thickness or aquifer
+          potential — that judgement stays with the qualified hydrogeologist reviewing the curve.
+        </p>
+        <p style="font-size:12px;color:var(--ink-600);margin:0;">
+          Works fully offline. All data stays in this browser's local storage on this device — export a
+          backup regularly, especially before clearing browser data or switching devices.
+        </p>
+      </div>
+
+    </section>
+
+  </main>
+
+  <nav class="tabbar">
+    <div class="tabbar-inner">
+      <button class="tabbtn active" data-tab="survey"><span class="ic">▤</span>Survey</button>
+      <button class="tabbtn" data-tab="report"><span class="ic">▦</span>Report</button>
+      <button class="tabbtn" data-tab="saved"><span class="ic">🗂</span>Saved</button>
+      <button class="tabbtn" data-tab="tools"><span class="ic">⚙</span>Tools</button>
+    </div>
+  </nav>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>

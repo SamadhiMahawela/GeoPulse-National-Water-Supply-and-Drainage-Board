@@ -1,0 +1,12 @@
+{
+  "name": "ves-field-tool",
+  "version": "2.0.0",
+  "private": true,
+  "description": "VES Field Tool — static app + serverless API (Vercel) + Postgres (Supabase)",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.11.5"
+  }
+}
