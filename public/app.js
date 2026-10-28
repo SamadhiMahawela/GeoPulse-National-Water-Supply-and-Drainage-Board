@@ -1,6 +1,6 @@
 (function(){
   "use strict";
-
+ 
   /* ---------------- storage keys ---------------- */
   var SURVEYS_KEY = "ves_surveys_v1";
   var DRAFT_KEY   = "ves_draft_v1";
@@ -8,7 +8,7 @@
   var THEME_KEY   = "ves_theme_v1";
   var SYNC_KEY    = "ves_sync_settings_v1";
   var DEVICE_KEY  = "ves_device_id_v1";
-
+ 
   /* ---------------- utilities ---------------- */
   function uid(){ return "id" + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
   function $(id){ return document.getElementById(id); }
@@ -40,7 +40,7 @@
     if (!survey.chartId) survey.chartId = generateChartId();
     return survey;
   }
-
+ 
   /* ---------------- state ---------------- */
   var emptyReading = function(){ return {id: uid(), ab2:"", mn2:"", rho:""}; };
   var current = {
@@ -51,12 +51,12 @@
     attachments: [],
     createdAt: Date.now(), updatedAt: Date.now()
   };
-
+ 
   function safeSetItem(key, value){
     try{ localStorage.setItem(key, value); return true; }
     catch(e){ return false; }
   }
-
+ 
   function loadSurveys(){
     try{ return JSON.parse(localStorage.getItem(SURVEYS_KEY)) || []; }catch(e){ return []; }
   }
@@ -74,21 +74,21 @@
     }
   }
   function saveProfile(p){ localStorage.setItem(PROFILE_KEY, JSON.stringify(p)); }
-
+ 
   /* ---------------- device id ---------------- */
   function getDeviceId(){
     var id = localStorage.getItem(DEVICE_KEY);
     if (!id){ id = uid(); localStorage.setItem(DEVICE_KEY, id); }
     return id;
   }
-
+ 
   /* ---------------- server sync ---------------- */
   function loadSyncSettings(){
     try{ return JSON.parse(localStorage.getItem(SYNC_KEY)) || {baseUrl:"", apiKey:"", lastSync:0}; }
     catch(e){ return {baseUrl:"", apiKey:"", lastSync:0}; }
   }
   function saveSyncSettings(s){ localStorage.setItem(SYNC_KEY, JSON.stringify(s)); }
-
+ 
   function apiFetch(path, options){
     var s = loadSyncSettings();
     if (!s.baseUrl) return Promise.reject(new Error("No server configured"));
@@ -101,13 +101,26 @@
     return fetch(base + path, options).then(function(res){
       if (!res.ok){
         return res.json().catch(function(){ return {}; }).then(function(body){
-          throw new Error(body.error || ("Server responded " + res.status));
+          var msg = body.error;
+          if (!msg){
+            if (res.status === 404) msg = "The server's API was not found (404). The 'api' folder may be missing from your GitHub repository.";
+            else if (res.status === 401 || res.status === 403) msg = "The server refused the request (" + res.status + "). Check the API key.";
+            else msg = "Server responded " + res.status;
+          }
+          var e = new Error(msg);
+          e.status = res.status;
+          throw e;
         });
       }
       return res.json();
+    }, function(){
+      // fetch itself failed: no internet, or the address is wrong
+      var e = new Error("Could not reach the server — check the internet connection and the Server URL.");
+      e.offline = true;
+      throw e;
     });
   }
-
+ 
   function surveyToPayload(s){
     return {
       siteName: s.siteName, clientName: s.clientName, chartId: s.chartId, lat: s.lat, lng: s.lng, date: s.date, vesNo: s.vesNo,
@@ -124,7 +137,7 @@
       createdAt: p.createdAt || Date.now(), updatedAt: p.updatedAt || Date.now()
     };
   }
-
+ 
   // Vercel rejects any single request bigger than about 4.5 MB, so check
   // first and give a clear message instead of a mysterious failure.
   var MAX_SYNC_BYTES = 4 * 1024 * 1024;
@@ -138,25 +151,31 @@
       method: "PUT", body: body
     });
   }
-
+ 
   function pushAllLocal(){
     var list = loadSurveys();
     if (list.length === 0){ toast("No local surveys to push"); return; }
     toast("Pushing " + list.length + " survey(s)…");
     var chain = Promise.resolve();
     var ok = 0, fail = 0;
+    var firstError = "";
     list.forEach(function(s){
       chain = chain.then(function(){
-        return pushSurvey(s).then(function(){ ok++; }).catch(function(){ fail++; });
+        return pushSurvey(s).then(function(){ ok++; }).catch(function(err){
+          fail++;
+          if (!firstError) firstError = (err && err.message) || "unknown error";
+        });
       });
     });
     chain.then(function(){
-      var s = loadSyncSettings(); s.lastSync = Date.now(); saveSyncSettings(s);
-      renderLastSyncNote();
-      toast("Pushed " + ok + " survey(s)" + (fail ? (", " + fail + " failed") : ""));
+      if (ok){
+        var s = loadSyncSettings(); s.lastSync = Date.now(); saveSyncSettings(s);
+        renderLastSyncNote();
+      }
+      toast("Pushed " + ok + " survey(s)" + (fail ? (", " + fail + " failed — " + firstError) : ""));
     });
   }
-
+ 
   // The server's list leaves out the heavy photo/file data (to stay under
   // Vercel's response size limit), so for every survey that is new or newer
   // than our local copy we download its full version one at a time.
@@ -165,12 +184,12 @@
       var local = loadSurveys();
       var byId = {};
       local.forEach(function(s){ byId[s.id] = s; });
-
+ 
       var needed = rows.filter(function(row){
         var existing = byId[row.id];
         return !existing || (row.updatedAt || 0) > (existing.updatedAt || 0);
       });
-
+ 
       var failed = 0;
       var chain = Promise.resolve();
       needed.forEach(function(row){
@@ -180,7 +199,7 @@
             .catch(function(){ failed++; });
         });
       });
-
+ 
       return chain.then(function(){
         var merged = Object.keys(byId).map(function(k){ return byId[k]; })
           .sort(function(a,b){ return (b.updatedAt||0) - (a.updatedAt||0); });
@@ -195,7 +214,7 @@
       });
     });
   }
-
+ 
   function renderLastSyncNote(){
     var el = $("lastSyncNote");
     if (!el) return;
@@ -205,7 +224,7 @@
       ? ("Last synced: " + new Date(s.lastSync).toLocaleString())
       : "Connected — not synced yet.";
   }
-
+ 
   function saveDraft(){
     var ok = safeSetItem(DRAFT_KEY, JSON.stringify(current));
     if (!ok) toast("⚠ Storage is full — remove a photo/file or export & clear old surveys");
@@ -218,7 +237,7 @@
     }catch(e){}
     return null;
   }
-
+ 
   /* ---------------- tabs ---------------- */
   var panels = {
     survey: $("panel-survey"), report: $("panel-report"),
@@ -235,7 +254,7 @@
       if (tab === "saved") renderSavedList();
     });
   });
-
+ 
   /* ---------------- theme ---------------- */
   function applyTheme(t){
     document.documentElement.setAttribute("data-theme", t);
@@ -246,7 +265,7 @@
     applyTheme(cur === "dark" ? "light" : "dark");
   });
   applyTheme(localStorage.getItem(THEME_KEY) || "light");
-
+ 
   /* ---------------- form binding ---------------- */
   var formFields = {
     f_siteName:"siteName", f_clientName:"clientName", f_lat:"lat", f_lng:"lng", f_date:"date",
@@ -270,7 +289,7 @@
       saveDraft();
     });
   });
-
+ 
   $("gpsBtn").addEventListener("click", function(){
     if (!navigator.geolocation){ toast("GPS not available on this device/browser"); return; }
     toast("Getting location…");
@@ -285,7 +304,7 @@
       toast("Could not get location: " + err.message);
     }, {enableHighAccuracy:true, timeout:12000});
   });
-
+ 
   /* ---------------- readings table ---------------- */
   function renderReadingsTable(){
     var body = $("readingsBody");
@@ -293,7 +312,7 @@
     var flags = computeQcFlags(current.readings);
     current.readings.forEach(function(r, i){
       var tr = document.createElement("tr");
-
+ 
       var tdIdx = document.createElement("td");
       tdIdx.className = "idx";
       tdIdx.textContent = (i+1);
@@ -305,7 +324,7 @@
         tdIdx.appendChild(flag);
       }
       tr.appendChild(tdIdx);
-
+ 
       ["ab2","mn2","rho"].forEach(function(key){
         var td = document.createElement("td");
         var inp = document.createElement("input");
@@ -323,10 +342,10 @@
         td.appendChild(inp);
         tr.appendChild(td);
       });
-
+ 
       var tdActions = document.createElement("td");
       tdActions.className = "rowactions";
-
+ 
       var upBtn = document.createElement("button");
       upBtn.type = "button";
       upBtn.innerHTML = "⬆";
@@ -336,7 +355,7 @@
         saveDraft(); renderReadingsTable(); renderChart();
       });
       tdActions.appendChild(upBtn);
-
+ 
       var downBtn = document.createElement("button");
       downBtn.type = "button";
       downBtn.innerHTML = "⬇";
@@ -346,7 +365,7 @@
         saveDraft(); renderReadingsTable(); renderChart();
       });
       tdActions.appendChild(downBtn);
-
+ 
       var rmBtn = document.createElement("button");
       rmBtn.type = "button";
       rmBtn.className = "rm";
@@ -361,12 +380,12 @@
       });
       tdActions.appendChild(rmBtn);
       tr.appendChild(tdActions);
-
+ 
       body.appendChild(tr);
     });
     renderQcNote();
   }
-
+ 
   function computeQcFlags(readings){
     var flags = {};
     var parsed = readings.map(function(r){
@@ -396,7 +415,7 @@
     if (n === 0){ box.innerHTML = ""; return; }
     box.innerHTML = "<div class='note warn'>" + n + " row(s) flagged for review — check the ⚠ marks in the table. This is a data-entry sanity check only, not a geological judgement.</div>";
   }
-
+ 
   $("addRowBtn").addEventListener("click", function(){
     current.readings.push(emptyReading());
     saveDraft(); renderReadingsTable(); renderChart();
@@ -410,7 +429,7 @@
     current.readings = [emptyReading(), emptyReading(), emptyReading(), emptyReading()];
     saveDraft(); renderReadingsTable(); renderChart();
   });
-
+ 
   /* ---------------- chart (custom log-log SVG) ---------------- */
   function validReadings(){
     return current.readings
@@ -418,13 +437,13 @@
       .filter(function(r){ return !isNaN(r.ab2) && !isNaN(r.rho) && r.ab2>0 && r.rho>0; })
       .sort(function(a,b){ return a.ab2 - b.ab2; });
   }
-
+ 
   function buildChartSVG(readings, opts){
     opts = opts || {};
     var W = 640, H = 460;
     var mL = 60, mR = 18, mT = 18, mB = 44;
     var plotW = W - mL - mR, plotH = H - mT - mB;
-
+ 
     var isDark = (document.documentElement.getAttribute("data-theme") === "dark");
     var col = {
       grid: isDark ? "#2C3742" : "#D6D0BE",
@@ -435,14 +454,14 @@
       pointStroke: isDark ? "#E3A34D" : "#A9631E",
       text: isDark ? "#EDEBE3" : "#1B1E1F"
     };
-
+ 
     if (readings.length < 2){
       return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">' +
         '<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="none"/>' +
         '<text x="'+(W/2)+'" y="'+(H/2)+'" text-anchor="middle" font-family="sans-serif" font-size="14" fill="'+col.text+'">' +
         'Enter at least 2 valid readings (AB/2 &amp; ρa &gt; 0) to draw the curve</text></svg>';
     }
-
+ 
     var xs = readings.map(function(r){return r.ab2;});
     var ys = readings.map(function(r){return r.rho;});
     var xMinE = Math.floor(Math.log10(Math.min.apply(null, xs)));
@@ -451,20 +470,20 @@
     var yMinE = Math.floor(Math.log10(Math.min.apply(null, ys)));
     var yMaxE = Math.ceil(Math.log10(Math.max.apply(null, ys)));
     if (yMinE === yMaxE) yMaxE = yMinE + 1;
-
+ 
     function xPix(v){ return mL + (Math.log10(v) - xMinE) / (xMaxE - xMinE) * plotW; }
     function yPix(v){ return mT + plotH - (Math.log10(v) - yMinE) / (yMaxE - yMinE) * plotH; }
-
+ 
     function decadeLabel(e){
       var v = Math.pow(10, e);
       if (v >= 1) return v.toLocaleString();
       return v.toString();
     }
-
+ 
     var svg = [];
     svg.push('<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" font-family="'+ '-apple-system,Segoe UI,Roboto,Arial,sans-serif' +'">');
     svg.push('<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="none"/>');
-
+ 
     // minor + major gridlines, X
     for (var e = xMinE; e <= xMaxE; e++){
       var xMaj = xPix(Math.pow(10,e));
@@ -491,39 +510,39 @@
         }
       }
     }
-
+ 
     // axes border
     svg.push('<rect x="'+mL+'" y="'+mT+'" width="'+plotW+'" height="'+plotH+'" fill="none" stroke="'+col.axis+'" stroke-width="1.1"/>');
-
+ 
     // axis titles
     svg.push('<text x="'+(mL+plotW/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="11.5" fill="'+col.text+'" font-weight="600">AB/2 (m)</text>');
     svg.push('<text x="14" y="'+(mT+plotH/2)+'" text-anchor="middle" font-size="11.5" fill="'+col.text+'" font-weight="600" transform="rotate(-90 14 '+(mT+plotH/2)+')">Apparent resistivity ρa (Ω·m)</text>');
-
+ 
     // polyline
     var pts = readings.map(function(r){ return xPix(r.ab2) + "," + yPix(r.rho); }).join(" ");
     svg.push('<polyline points="'+pts+'" fill="none" stroke="'+col.line+'" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>');
-
+ 
     // points
     readings.forEach(function(r){
       svg.push('<circle cx="'+xPix(r.ab2)+'" cy="'+yPix(r.rho)+'" r="4" fill="'+col.point+'" stroke="'+col.pointStroke+'" stroke-width="2"/>');
     });
-
+ 
     svg.push('</svg>');
     return svg.join("");
   }
-
+ 
   function renderChart(){
     var readings = validReadings();
     $("chartHost").innerHTML = buildChartSVG(readings);
   }
-
+ 
   /* ---------------- attachments (photos & files) ---------------- */
   function fmtBytes(n){
     if (n < 1024) return n + " B";
     if (n < 1024*1024) return (n/1024).toFixed(0) + " KB";
     return (n/(1024*1024)).toFixed(1) + " MB";
   }
-
+ 
   function readAsDataURL(file){
     return new Promise(function(resolve, reject){
       var r = new FileReader();
@@ -532,7 +551,7 @@
       r.readAsDataURL(file);
     });
   }
-
+ 
   // Downscale + re-compress images before storing, so a handful of phone
   // photos don't blow through the browser's local-storage quota.
   function compressImageDataUrl(dataUrl, maxDim, quality){
@@ -553,7 +572,7 @@
       img.src = dataUrl;
     });
   }
-
+ 
   function processFile(file){
     var isImage = file.type.indexOf("image/") === 0;
     return readAsDataURL(file).then(function(raw){
@@ -574,7 +593,7 @@
       };
     });
   }
-
+ 
   function fileIconFor(att){
     if (att.kind === "image") return "";
     var m = (att.mime||"").toLowerCase();
@@ -583,7 +602,7 @@
     if (m.indexOf("sheet") >= 0 || att.name.match(/\.xlsx?$/i)) return "📊";
     return "📎";
   }
-
+ 
   function renderAttachments(){
     var host = $("attachmentsList");
     var list = current.attachments || [];
@@ -591,7 +610,7 @@
     list.forEach(function(att){
       var row = document.createElement("div");
       row.className = "attach-item";
-
+ 
       var thumb;
       if (att.kind === "image"){
         thumb = document.createElement("img");
@@ -604,7 +623,7 @@
         thumb.textContent = fileIconFor(att);
       }
       row.appendChild(thumb);
-
+ 
       var info = document.createElement("div");
       info.className = "info";
       var fname = document.createElement("div");
@@ -616,10 +635,10 @@
       info.appendChild(fname);
       info.appendChild(fmeta);
       row.appendChild(info);
-
+ 
       var controls = document.createElement("div");
       controls.className = "controls";
-
+ 
       var incLabel = document.createElement("label");
       incLabel.className = "inc";
       var incBox = document.createElement("input");
@@ -633,7 +652,7 @@
       incLabel.appendChild(incBox);
       incLabel.appendChild(document.createTextNode("Include in report"));
       controls.appendChild(incLabel);
-
+ 
       var rmBtn = document.createElement("button");
       rmBtn.type = "button";
       rmBtn.className = "rmfile";
@@ -645,11 +664,11 @@
         renderAttachments();
       });
       controls.appendChild(rmBtn);
-
+ 
       row.appendChild(controls);
       host.appendChild(row);
     });
-
+ 
     var note = $("attachStorageNote");
     if (list.length === 0){
       note.textContent = "No files attached yet.";
@@ -660,7 +679,7 @@
         inReport + " selected for the report.";
     }
   }
-
+ 
   $("fileUploadInput").addEventListener("change", function(e){
     var files = Array.prototype.slice.call(e.target.files || []);
     // Photos are shrunk automatically, but PDFs/Word/Excel files are stored as-is.
@@ -692,7 +711,7 @@
       $("fileUploadInput").value = "";
     });
   });
-
+ 
   /* ---------------- save / load survey ---------------- */
   $("saveSurveyBtn").addEventListener("click", function(){
     if (!current.siteName){ toast("Add a site name before saving"); return; }
@@ -709,21 +728,25 @@
     toast("Survey saved");
     var syncSettings = loadSyncSettings();
     if (syncSettings.baseUrl){
+      if (!syncSettings.apiKey){
+        toast("Saved on this device only — enter the API key in Tools → Server sync to share it with the team");
+        return;
+      }
       pushSurvey(current).then(function(){
         var s = loadSyncSettings(); s.lastSync = Date.now(); saveSyncSettings(s);
         renderLastSyncNote();
         toast("Saved locally and synced to server");
       }).catch(function(err){
-        var msg = (err && err.message) || "";
-        if (msg.indexOf("too large") >= 0 || msg.indexOf("API key") >= 0){
-          toast("Saved on this device only — " + msg);
+        var msg = (err && err.message) || "unknown error";
+        if (err && err.offline){
+          toast("Saved on this device — no connection. Sync later from the Tools tab.");
         } else {
-          toast("Saved on this device — could not reach the server, sync later from the Tools tab");
+          toast("Saved on this device only — server said: " + msg);
         }
       });
     }
   });
-
+ 
   $("newSurveyBtn").addEventListener("click", function(){
     if (!confirm("Start a new blank survey? Unsaved changes to the current one will be lost.")) return;
     current = {
@@ -737,7 +760,7 @@
     fillFormFromState();
     toast("New survey started");
   });
-
+ 
   /* ---------------- saved list ---------------- */
   function renderSavedList(){
     var list = loadSurveys();
@@ -768,6 +791,7 @@
         '</div>' +
         '<div class="actions">' +
           '<button class="btn secondary small" data-act="load">Open</button>' +
+          '<button class="btn secondary small" data-act="report">Report</button>' +
           '<button class="btn ghost small" data-act="dup">Duplicate</button>' +
           '<button class="btn ghost small" data-act="csv">CSV</button>' +
           '<button class="btn ghost small" data-act="txt">Text file</button>' +
@@ -779,6 +803,15 @@
         fillFormFromState();
         document.querySelector('.tabbtn[data-tab="survey"]').click();
         toast("Survey loaded");
+      });
+      el.querySelector('[data-act="report"]').addEventListener("click", function(){
+        // load this saved survey and jump straight to its printable report
+        current = JSON.parse(JSON.stringify(s));
+        if (!current.attachments) current.attachments = [];
+        saveDraft();
+        fillFormFromState();
+        document.querySelector('.tabbtn[data-tab="report"]').click();
+        toast("Report for " + (s.chartId || s.siteName || "survey"));
       });
       el.querySelector('[data-act="dup"]').addEventListener("click", function(){
         var copy = JSON.parse(JSON.stringify(s));
@@ -807,13 +840,13 @@
     });
   }
   $("searchSaved").addEventListener("input", renderSavedList);
-
+ 
   function escapeHtml(str){
     return String(str).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   }
-
+ 
   /* ---------------- CSV export/import ---------------- */
   function downloadBlob(content, filename, type){
     var blob = new Blob([content], {type: type});
@@ -834,7 +867,7 @@
     toast("CSV exported");
   }
   $("exportCsvBtn").addEventListener("click", function(){ downloadCsv(current); });
-
+ 
   function surveyToText(survey){
     var lines = [];
     lines.push("VERTICAL ELECTRICAL SOUNDING - FIELD DATA");
@@ -863,14 +896,14 @@
     toast("Text file saved");
   }
   $("saveTxtBtn").addEventListener("click", function(){ downloadTxt(current); });
-
+ 
   $("exportJsonAllBtn").addEventListener("click", function(){
     var list = loadSurveys();
     downloadBlob(JSON.stringify({exportedAt:new Date().toISOString(), surveys:list}, null, 2),
       "ves_surveys_backup_" + todayISO() + ".json", "application/json");
     toast("Backup exported");
   });
-
+ 
   $("jsonImportFile").addEventListener("change", function(e){
     var file = e.target.files[0];
     if (!file) return;
@@ -895,7 +928,7 @@
     };
     reader.readAsText(file);
   });
-
+ 
   $("importPasteBtn").addEventListener("click", function(){
     var raw = $("csvPaste").value.trim();
     if (!raw){ toast("Paste some AB/2, ρa pairs first"); return; }
@@ -923,7 +956,7 @@
       toast("Could not parse any valid rows");
     }
   });
-
+ 
   /* ---------------- raw reading calculator ---------------- */
   $("c_array").addEventListener("change", function(){
     var isW = $("c_array").value === "Wenner";
@@ -964,7 +997,7 @@
     box.className = "note";
     box.innerHTML = detail + "<br><strong>ρa ≈ " + fmtNum(rho) + " Ω·m</strong>";
   });
-
+ 
   /* ---------------- profile ---------------- */
   function fillProfileForm(){
     var p = loadProfile();
@@ -996,7 +1029,7 @@
     fillProfileForm();
     toast("Profile saved");
   });
-
+ 
   /* ---------------- sync UI wiring ---------------- */
   function fillSyncForm(){
     var s = loadSyncSettings();
@@ -1012,7 +1045,7 @@
       lastSync: loadSyncSettings().lastSync || 0
     });
     renderLastSyncNote();
-    toast("Connection settings saved");
+    toast($("s_apiKey").value.trim() ? "Connection settings saved" : "Saved — but the API key is empty. Paste the key, then tap Save connection again.");
   });
   $("testSyncBtn").addEventListener("click", function(){
     var box = $("syncStatus");
@@ -1046,7 +1079,7 @@
       toast("Pull failed: " + err.message);
     });
   });
-
+ 
   /* ---------------- report ---------------- */
   function renderReport(){
     var p = loadProfile();
@@ -1055,7 +1088,7 @@
     var rows = readings.map(function(r,i){
       return "<tr><td>"+(i+1)+"</td><td>"+escapeHtml(r.ab2)+"</td><td>"+escapeHtml(r.mn2||"—")+"</td><td>"+escapeHtml(r.rho)+"</td></tr>";
     }).join("");
-
+ 
     var reportAtts = (current.attachments || []).filter(function(a){ return a.includeInReport; });
     var reportImages = reportAtts.filter(function(a){ return a.kind === "image"; });
     var reportOtherFiles = reportAtts.filter(function(a){ return a.kind !== "image"; });
@@ -1076,7 +1109,7 @@
       }
       attachmentsHtml += '</div>';
     }
-
+ 
     var html =
       '<div class="rl-header">' +
         (p.logo ? '<img src="'+p.logo+'">' : '') +
@@ -1111,14 +1144,14 @@
     return '<div><span>'+escapeHtml(label)+'</span>'+escapeHtml(val || "—")+'</div>';
   }
   $("printBtn").addEventListener("click", function(){ window.print(); });
-
+ 
   /* ---------------- init ---------------- */
   var draft = loadDraft();
   if (draft) current = draft;
   $("f_date").value = current.date || todayISO();
   fillFormFromState();
   fillProfileForm();
-
+ 
   // If this page was opened via http(s) from the backend itself (rather than
   // as a local file), and no server is configured yet, assume "this same
   // server" — saves field staff from having to type the URL themselves.
@@ -1129,18 +1162,18 @@
       saveSyncSettings(s);
     }
   })();
-
+ 
   fillSyncForm();
   renderSavedList();
-
+ 
   // if a server is configured, quietly try to pull the latest data on startup
   if (loadSyncSettings().baseUrl){
     pullAll().then(function(){ renderSavedList(); }).catch(function(){ /* stay on local data if offline */ });
   }
-
+ 
   // re-render chart on theme change so colours match
   $("themeToggleBtn").addEventListener("click", function(){ renderChart(); });
-
+ 
   /* ---------------- offline support ---------------- */
   // Caches the app's own files so it still opens with zero signal after the
   // first visit. Only works when served over http(s) (e.g. from the backend) —
@@ -1153,7 +1186,7 @@
       });
     });
   }
-
+ 
   function updateConnBadge(){
     var badge = $("connBadge");
     badge.style.display = navigator.onLine ? "none" : "inline-block";
@@ -1161,5 +1194,6 @@
   window.addEventListener("online", updateConnBadge);
   window.addEventListener("offline", updateConnBadge);
   updateConnBadge();
-
+ 
 })();
+ 
