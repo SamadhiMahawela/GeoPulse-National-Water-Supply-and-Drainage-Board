@@ -3,8 +3,8 @@
 // never caches /api/... calls, since survey data always needs a real,
 // current answer from the server (the app's own code already handles a
 // failed API call gracefully — see app.js's sync functions).
-
-var CACHE_NAME = "ves-app-shell-v4";
+ 
+var CACHE_NAME = "ves-app-shell-v5";
 var APP_SHELL = [
   "./",
   "./index.html",
@@ -15,7 +15,7 @@ var APP_SHELL = [
   "./icon-512.png",
   "./icon-512-maskable.png"
 ];
-
+ 
 self.addEventListener("install", function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -23,7 +23,7 @@ self.addEventListener("install", function (event) {
       .then(function () { return self.skipWaiting(); })
   );
 });
-
+ 
 self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (keys) {
@@ -34,16 +34,16 @@ self.addEventListener("activate", function (event) {
     }).then(function () { return self.clients.claim(); })
   );
 });
-
+ 
 self.addEventListener("fetch", function (event) {
   var url = new URL(event.request.url);
-
+ 
   // Only handle our own GET requests for the app shell — never touch
   // cross-origin requests or the /api/ data endpoints.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.indexOf("/api/") === 0) return;
   if (event.request.method !== "GET") return;
-
+ 
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(function (cached) {
       var networkFetch = fetch(event.request).then(function (response) {
