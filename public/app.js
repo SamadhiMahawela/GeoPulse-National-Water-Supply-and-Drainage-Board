@@ -100,8 +100,11 @@
     }, options.headers || {});
     return fetch(base + path, options).then(function(res){
       if (!res.ok){
-        return res.json().catch(function(){ return {}; }).then(function(body){
+        return res.text().then(function(txt){
+          var body = {};
+          try { body = JSON.parse(txt) || {}; } catch(e) { body = {}; }
           var msg = body.error;
+          if (!msg && txt && txt.length < 300) msg = "Server responded " + res.status + ": " + txt.replace(/\s+/g," ").trim();
           if (!msg){
             if (res.status === 404) msg = "The server's API was not found (404). The 'api' folder may be missing from your GitHub repository.";
             else if (res.status === 401 || res.status === 403) msg = "The server refused the request (" + res.status + "). Check the API key.";
