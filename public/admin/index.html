@@ -162,8 +162,8 @@
         '<td>'+ (r.attachments ? r.attachments.length : 0) +'</td>' +
         '<td>'+esc(r.operator||"—")+'</td>' +
         '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
-        '<td class="links"><a href="survey.html?id='+id+'" target="_blank" rel="noopener">Full record</a>' +
-        '<a href="report.html?id='+id+'" target="_blank" rel="noopener">Report</a></td>' +
+        '<td class="links"><a href="/admin/survey.html?id='+id+'" target="_blank" rel="noopener">Full record</a>' +
+        '<a href="/admin/report.html?id='+id+'" target="_blank" rel="noopener">Report</a></td>' +
       '</tr>';
     });
     html += '</tbody></table>';
