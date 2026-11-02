@@ -26,12 +26,15 @@
   #status.ok{color:#2F6E4E;}
   .pill{display:inline-block;background:#EEEADC;border-radius:20px;padding:1px 8px;font-size:11px;}
   .empty{padding:30px;text-align:center;color:#7B8287;}
+  .mini{width:130px;height:78px;display:block;border:1px solid var(--line);border-radius:4px;background:#fff;}
+  .links a{display:inline-block;margin-right:10px;white-space:nowrap;}
+  #searchBox{margin:0;}
 </style>
 </head>
 <body>
 <header>
   <h1>VES Server — Admin</h1>
-  <p>Read-only overview of every survey saved by any device connected to this server.</p>
+  <p>Every survey saved by any device: charts, full records, reports and attachments.</p>
 </header>
 <main>
   <div class="card">
@@ -44,23 +47,25 @@
     <button class="secondary" id="exportBtn">Export all as CSV</button>
     <div id="status"></div>
   </div>
-
+ 
   <div class="card">
+    <input id="searchBox" placeholder="Search by site, client, Chart ID, VES no. or recorded by…">
     <div id="tableHost"><div class="empty">Connect to a server above to see surveys.</div></div>
   </div>
 </main>
-
+ 
 <script>
 (function(){
   "use strict";
   var LS_KEY = "ves_admin_connection_v1";
-
+ 
   var baseUrlEl = document.getElementById("baseUrl");
   var apiKeyEl = document.getElementById("apiKey");
   var statusEl = document.getElementById("status");
   var tableHost = document.getElementById("tableHost");
+  var searchEl = document.getElementById("searchBox");
   var lastRows = [];
-
+ 
   function loadSaved(){
     try{
       var s = JSON.parse(localStorage.getItem(LS_KEY));
@@ -70,12 +75,12 @@
   function persist(){
     localStorage.setItem(LS_KEY, JSON.stringify({baseUrl: baseUrlEl.value.trim(), apiKey: apiKeyEl.value.trim()}));
   }
-
+ 
   function setStatus(msg, cls){
     statusEl.textContent = msg;
     statusEl.className = cls || "";
   }
-
+ 
   function fetchSurveys(){
     var base = baseUrlEl.value.trim().replace(/\/+$/,"");
     var key = apiKeyEl.value.trim();
@@ -83,30 +88,70 @@
     setStatus("Loading…");
     fetch(base + "/api/surveys", { headers: { "x-api-key": key } })
       .then(function(res){
-        if (!res.ok) throw new Error("Server responded " + res.status + " (check the API key)");
+        if (!res.ok) {
+          return res.text().then(function(txt){
+            var msg = "";
+            try { msg = (JSON.parse(txt) || {}).error || ""; } catch(e) {}
+            if (!msg) msg = (txt || "").replace(/\s+/g, " ").trim().slice(0, 250);
+            if (res.status === 401) msg = (msg || "Invalid API key") + " — check the API key.";
+            throw new Error("Server responded " + res.status + (msg ? ": " + msg : ""));
+          });
+        }
         return res.json();
       })
       .then(function(rows){
         lastRows = rows;
-        renderTable(rows);
+        renderTable();
         setStatus("Loaded " + rows.length + " survey(s) — " + new Date().toLocaleTimeString(), "ok");
       })
       .catch(function(err){ setStatus("Error: " + err.message, "err"); });
   }
-
+ 
   function esc(s){
     return String(s==null?"":s).replace(/[&<>"']/g, function(c){
       return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
     });
   }
-
-  function renderTable(rows){
-    if (!rows.length){ tableHost.innerHTML = '<div class="empty">No surveys on this server yet.</div>'; return; }
+ 
+  // a small log-log picture of the sounding curve, drawn from the saved readings
+  function miniChart(readings){
+    var pts = (readings || [])
+      .map(function(r){ return {x: parseFloat(r.ab2), y: parseFloat(r.rho)}; })
+      .filter(function(r){ return r.x > 0 && r.y > 0; })
+      .sort(function(a,b){ return a.x - b.x; });
+    if (pts.length < 2) return '<div class="mini" style="display:flex;align-items:center;justify-content:center;color:#7B8287;font-size:11px;">no curve</div>';
+    var W=130, H=78, m=8;
+    var lx = pts.map(function(p){ return Math.log10(p.x); }), ly = pts.map(function(p){ return Math.log10(p.y); });
+    var x0=Math.min.apply(null,lx), x1=Math.max.apply(null,lx), y0=Math.min.apply(null,ly), y1=Math.max.apply(null,ly);
+    if (x1===x0) x1=x0+1; if (y1===y0) y1=y0+1;
+    var xy = pts.map(function(p,i){
+      return [ m + (lx[i]-x0)/(x1-x0)*(W-2*m), H - m - (ly[i]-y0)/(y1-y0)*(H-2*m) ];
+    });
+    var line = xy.map(function(c){ return c[0].toFixed(1)+","+c[1].toFixed(1); }).join(" ");
+    var dots = xy.map(function(c){ return '<circle cx="'+c[0].toFixed(1)+'" cy="'+c[1].toFixed(1)+'" r="2.4" fill="#fff" stroke="#A9631E" stroke-width="1.4"/>'; }).join("");
+    return '<svg class="mini" viewBox="0 0 '+W+' '+H+'"><polyline points="'+line+'" fill="none" stroke="#C67B2E" stroke-width="1.8" stroke-linejoin="round"/>'+dots+'</svg>';
+  }
+ 
+  function matches(r, q){
+    if (!q) return true;
+    q = q.toLowerCase();
+    return [r.siteName, r.clientName, r.chartId, r.vesNo, r.operator, r.date].some(function(v){
+      return String(v == null ? "" : v).toLowerCase().indexOf(q) >= 0;
+    });
+  }
+ 
+  function renderTable(){
+    var q = searchEl.value.trim();
+    var rows = lastRows.filter(function(r){ return matches(r, q); });
+    if (!lastRows.length){ tableHost.innerHTML = '<div class="empty">No surveys on this server yet.</div>'; return; }
+    if (!rows.length){ tableHost.innerHTML = '<div class="empty">No survey matches "'+esc(q)+'".</div>'; return; }
     var html = '<table><thead><tr>' +
-      '<th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Device</th><th>Updated</th>' +
+      '<th>Chart</th><th>Chart ID</th><th>Site</th><th>Client</th><th>VES No.</th><th>Date</th><th>Array</th><th>Readings</th><th>Files</th><th>Recorded by</th><th>Updated</th><th>Open</th>' +
       '</tr></thead><tbody>';
     rows.forEach(function(r){
+      var id = encodeURIComponent(r.id);
       html += '<tr>' +
+        '<td>'+miniChart(r.readings)+'</td>' +
         '<td style="font-family:monospace;font-size:11px;">'+esc(r.chartId||"—")+'</td>' +
         '<td>'+esc(r.siteName||"—")+'</td>' +
         '<td>'+esc(r.clientName||"—")+'</td>' +
@@ -116,14 +161,16 @@
         '<td>'+ (r.readings ? r.readings.length : 0) +'</td>' +
         '<td>'+ (r.attachments ? r.attachments.length : 0) +'</td>' +
         '<td>'+esc(r.operator||"—")+'</td>' +
-        '<td style="font-family:monospace;font-size:11px;">'+esc((r.deviceId||"").slice(0,10))+'</td>' +
         '<td>'+ (r.updatedAt ? new Date(r.updatedAt).toLocaleString() : "—") +'</td>' +
+        '<td class="links"><a href="survey.html?id='+id+'" target="_blank" rel="noopener">Full record</a>' +
+        '<a href="report.html?id='+id+'" target="_blank" rel="noopener">Report</a></td>' +
       '</tr>';
     });
     html += '</tbody></table>';
     tableHost.innerHTML = html;
+    if (q) setStatus("Showing " + rows.length + " of " + lastRows.length + " survey(s)", "ok");
   }
-
+ 
   function exportCsv(){
     if (!lastRows.length){ setStatus("Nothing loaded to export yet — click Refresh first.", "err"); return; }
     var lines = ["Chart ID,Site,Client,VES No,Date,Array,Readings Count,Recorded By,Device,Updated"];
@@ -140,11 +187,12 @@
     document.body.appendChild(a); a.click();
     setTimeout(function(){ document.body.removeChild(a); }, 300);
   }
-
+ 
   document.getElementById("connectBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
   document.getElementById("refreshBtn").addEventListener("click", function(){ persist(); fetchSurveys(); });
   document.getElementById("exportBtn").addEventListener("click", exportCsv);
-
+  searchEl.addEventListener("input", renderTable);
+ 
   loadSaved();
   if (!baseUrlEl.value && location.protocol.indexOf('http') === 0) baseUrlEl.value = location.origin;
   if (baseUrlEl.value) fetchSurveys();
