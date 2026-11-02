@@ -45,7 +45,7 @@
 </header>
 <main>
   <div class="bar">
-    <a class="secondary" href="./">← All surveys</a>
+    <a class="secondary" href="/admin/index.html">← All surveys</a>
     <a id="reportLink" href="#" target="_blank" rel="noopener">📄 Open printable report</a>
   </div>
   <div id="msg">Loading…</div>
@@ -232,7 +232,7 @@
  
   var id = new URLSearchParams(location.search).get("id");
   if (!id){ fail("No survey chosen. Go back to the list and click Full record next to a survey."); return; }
-  $("reportLink").href = "report.html?id=" + encodeURIComponent(id);
+  $("reportLink").href = "/admin/report.html?id=" + encodeURIComponent(id);
  
   var conn = readJson("ves_admin_connection_v1") || {};
   var sync = readJson("ves_sync_settings_v1") || {};
