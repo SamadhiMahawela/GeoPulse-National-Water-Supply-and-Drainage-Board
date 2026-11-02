@@ -4,7 +4,7 @@
 // current answer from the server (the app's own code already handles a
 // failed API call gracefully — see app.js's sync functions).
  
-var CACHE_NAME = "ves-app-shell-v5";
+var CACHE_NAME = "ves-app-shell-v6";
 var APP_SHELL = [
   "./",
   "./index.html",
@@ -63,3 +63,4 @@ self.addEventListener("fetch", function (event) {
     })
   );
 });
+ 
