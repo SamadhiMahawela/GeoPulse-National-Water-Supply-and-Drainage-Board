@@ -1,10 +1,27 @@
 {
   "outputDirectory": "public",
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/admin/index.html"
+    },
+    {
+      "source": "/survey.html",
+      "destination": "/admin/survey.html"
+    },
+    {
+      "source": "/report.html",
+      "destination": "/admin/report.html"
+    }
+  ],
   "headers": [
     {
       "source": "/service-worker.js",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
       ]
     }
   ]
